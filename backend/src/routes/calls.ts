@@ -1,46 +1,14 @@
 import { Hono } from 'hono';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 import { db } from '../db/client';
-import { calls, stakeholders } from '../db/schema';
+import { calls, stakeholders, questions } from '../db/schema';
 import { parseFile } from '../lib/parseFile';
 import { callClaude } from '../ai/client';
 import { CALL_PARSE_SYSTEM, extractMetadata } from '../ai/prompts/parseCall';
+import { fuzzyMatchName, fuzzyMatchText } from '../lib/fuzzyMatch';
+import type { ParsedQuestion } from '../ai/prompts/parseCall';
 
 export const callRoutes = new Hono();
-
-// ---- fuzzy match helpers ----
-
-function normalize(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-function levenshtein(a: string, b: string): number {
-  const m = a.length;
-  const n = b.length;
-  // Space-optimised single-row DP
-  const dp: number[] = Array.from({ length: n + 1 }, (_, i) => i);
-  for (let i = 1; i <= m; i++) {
-    let prev = dp[0];
-    dp[0] = i;
-    for (let j = 1; j <= n; j++) {
-      const temp = dp[j];
-      dp[j] =
-        a[i - 1] === b[j - 1]
-          ? prev
-          : 1 + Math.min(prev, dp[j], dp[j - 1]);
-      prev = temp;
-    }
-  }
-  return dp[n];
-}
-
-function fuzzyMatch(nameA: string, nameB: string): boolean {
-  const a = normalize(nameA);
-  const b = normalize(nameB);
-  if (!a || !b) return false;
-  if (a.includes(b) || b.includes(a)) return true;
-  return levenshtein(a, b) < 3;
-}
 
 // ---- attendee seeding helper ----
 
@@ -58,7 +26,7 @@ async function seedAttendees(
   for (const attendee of attendees) {
     if (!attendee.name.trim()) continue;
 
-    const isMatch = updated.some(s => fuzzyMatch(s.name, attendee.name));
+    const isMatch = fuzzyMatchName(attendee.name, updated.map(s => s.name)) !== null;
     if (isMatch) {
       merged++;
     } else {
@@ -84,6 +52,126 @@ async function seedAttendees(
   }
 
   return { seeded, merged, updatedList: updated };
+}
+
+// ---- question seeding helpers ----
+
+type QuestionRow = typeof questions.$inferSelect;
+
+async function seedQuestions(
+  accountId: string,
+  callId: string,
+  callDate: string | null,
+  parsedQuestions: ParsedQuestion[],
+  accountStakeholders: StakeholderRow[]
+): Promise<number> {
+  let seeded = 0;
+  for (const pq of parsedQuestions) {
+    if (!pq.asker_name.trim() || !pq.question_text.trim()) continue;
+    const matchedStakeholder = fuzzyMatchName(pq.asker_name, accountStakeholders.map(s => s.name));
+    const stakeholderId = matchedStakeholder
+      ? (accountStakeholders.find(s => s.name === matchedStakeholder)?.id ?? null)
+      : null;
+
+    const now = Date.now();
+    const rand = Math.random().toString(36).slice(2, 7);
+    const id = `q-${accountId}-${now}-${rand}`;
+
+    await db.insert(questions).values({
+      id,
+      account_id: accountId,
+      call_id: callId,
+      asker_name: pq.asker_name.trim(),
+      asker_stakeholder_id: stakeholderId,
+      question_text: pq.question_text.trim(),
+      status: 'open',
+      asked_at: callDate ?? null,
+      created_at: now,
+      updated_at: now,
+    });
+    seeded++;
+  }
+  return seeded;
+}
+
+async function reparseQuestions(
+  accountId: string,
+  callId: string,
+  callDate: string | null,
+  parsedQuestions: ParsedQuestion[],
+  accountStakeholders: StakeholderRow[]
+): Promise<{ inserted: number; preserved: number }> {
+  const existingOnCall: QuestionRow[] = await db
+    .select()
+    .from(questions)
+    .where(and(eq(questions.call_id, callId), eq(questions.account_id, accountId)));
+
+  const matchedExistingIds = new Set<string>();
+  let inserted = 0;
+  let preserved = 0;
+
+  for (const pq of parsedQuestions) {
+    if (!pq.asker_name.trim() || !pq.question_text.trim()) continue;
+
+    const matchedText = fuzzyMatchText(
+      pq.question_text,
+      existingOnCall.filter(q => !matchedExistingIds.has(q.id)).map(q => q.question_text)
+    );
+
+    const existingMatch = matchedText
+      ? existingOnCall.find(q => !matchedExistingIds.has(q.id) && q.question_text === matchedText)
+      : null;
+
+    const matchedStakeholder = fuzzyMatchName(pq.asker_name, accountStakeholders.map(s => s.name));
+    const stakeholderId = matchedStakeholder
+      ? (accountStakeholders.find(s => s.name === matchedStakeholder)?.id ?? null)
+      : null;
+
+    if (existingMatch) {
+      matchedExistingIds.add(existingMatch.id);
+      // Preserve status/resolution; update question_text and stakeholder link
+      await db.update(questions).set({
+        question_text: pq.question_text.trim(),
+        asker_stakeholder_id: stakeholderId,
+        updated_at: Date.now(),
+      }).where(eq(questions.id, existingMatch.id));
+      preserved++;
+    } else {
+      const now = Date.now();
+      const rand = Math.random().toString(36).slice(2, 7);
+      const id = `q-${accountId}-${now}-${rand}`;
+      await db.insert(questions).values({
+        id,
+        account_id: accountId,
+        call_id: callId,
+        asker_name: pq.asker_name.trim(),
+        asker_stakeholder_id: stakeholderId,
+        question_text: pq.question_text.trim(),
+        status: 'open',
+        asked_at: callDate ?? null,
+        created_at: now,
+        updated_at: now,
+      });
+      inserted++;
+    }
+  }
+
+  // Re-run stakeholder attribution on unmatched existing questions
+  for (const eq_ of existingOnCall) {
+    if (matchedExistingIds.has(eq_.id)) continue;
+    const matchedStakeholder = fuzzyMatchName(eq_.asker_name, accountStakeholders.map(s => s.name));
+    const stakeholderId = matchedStakeholder
+      ? (accountStakeholders.find(s => s.name === matchedStakeholder)?.id ?? null)
+      : null;
+    if (stakeholderId !== eq_.asker_stakeholder_id) {
+      await db.update(questions).set({
+        asker_stakeholder_id: stakeholderId,
+        updated_at: Date.now(),
+      }).where(eq(questions.id, eq_.id));
+    }
+  }
+
+  return { inserted, preserved };
 }
 
 // ---- POST /api/accounts/:accountId/calls/upload ----
@@ -168,8 +256,16 @@ callRoutes.post('/accounts/:accountId/calls/upload', async (c) => {
       );
       existingStakeholders = updatedList;
 
+      const questionsSeeded = await seedQuestions(
+        accountId,
+        id,
+        metadata.date ?? null,
+        metadata.questions ?? [],
+        existingStakeholders
+      );
+
       const created = (await db.select().from(calls).where(eq(calls.id, id)))[0];
-      results.push({ ok: true, filename, call: created, attendeesSeeded: seeded, attendeesMerged: merged });
+      results.push({ ok: true, filename, call: created, attendeesSeeded: seeded, attendeesMerged: merged, questionsSeeded });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[calls/upload] failed for "${filename}":`, message);
@@ -293,12 +389,20 @@ callRoutes.post('/calls/:id/reparse', async (c) => {
     .from(stakeholders)
     .where(eq(stakeholders.account_id, existing.account_id));
 
-  const { seeded, merged } = await seedAttendees(
+  const { seeded, merged, updatedList } = await seedAttendees(
     existing.account_id,
     metadata.customer_attendees ?? [],
     existingStakeholders
   );
 
+  const { inserted: questionsInserted, preserved: questionsPreserved } = await reparseQuestions(
+    existing.account_id,
+    id,
+    metadata.date ?? null,
+    metadata.questions ?? [],
+    updatedList
+  );
+
   const updated = (await db.select().from(calls).where(eq(calls.id, id)))[0];
-  return c.json({ call: updated, attendeesSeeded: seeded, attendeesMerged: merged });
+  return c.json({ call: updated, attendeesSeeded: seeded, attendeesMerged: merged, questionsInserted, questionsPreserved });
 });

@@ -16,6 +16,10 @@ WHAT WE HEARD
 - {customer signal, pain point, or direct quote worth noting}
 - {customer signal, pain point, or direct quote worth noting}
 
+QUESTIONS RAISED
+- [{asker_name}] {question text}
+- [{asker_name}] {question text}
+
 ACTION ITEMS
 - [{owner first name or "Brendan"}] {action} (by {date if mentioned, otherwise omit the parenthetical})
 
@@ -32,7 +36,10 @@ NEXT STEP
   "customer_attendees": [
     {"name": "{full name}", "title": "{job title or empty string}", "company": "{company name or empty string}"}
   ],
-  "health": "{green|yellow|red}"
+  "health": "{green|yellow|red}",
+  "questions": [
+    {"asker_name": "Sarah Chen", "question_text": "How does your platform handle service accounts in legacy systems?"}
+  ]
 }
 </metadata>
 
@@ -43,13 +50,22 @@ RULES:
 4. The <metadata> block must contain valid JSON parseable by JSON.parse. No trailing commas, no comments.
 5. All text before <metadata> is plain text the user will read directly. Do not use markdown headers (no ##). Use the exact section names shown above.
 6. DEAL HEALTH rating guide: green = deal progressing well, customer engaged, clear path forward; yellow = slowing momentum, unclear next step, or mixed signals; red = deal at risk, champion gone dark, major objection unaddressed, or active competitor threat.
-7. If the transcript is a short or incomplete recording, do your best with what is available. Do not fabricate information.`;
+7. If the transcript is a short or incomplete recording, do your best with what is available. Do not fabricate information.
+8. "questions" must be an array (empty array if none). Each entry has "asker_name" and "question_text". Include 0 to 15 questions per call. A question qualifies if: (a) a customer participant asked something that needs an answer from Oasis, (b) a customer raised an objection or concern that needs follow-up, or (c) a customer flagged an open issue. Exclude rhetorical questions and questions Brendan or Oasis employees asked. Do NOT include every interrogative sentence. Only record questions that represent a genuine open loop.
+9. "asker_name" in the questions array must exactly match the name as written in the ATTENDEES section. We fuzzy-match downstream but exact match is preferred.
+10. If QUESTIONS RAISED has no entries, write "None." under the section header in the plain text and return an empty array in the metadata.`;
+
+export interface ParsedQuestion {
+  asker_name: string;
+  question_text: string;
+}
 
 export interface ParsedMetadata {
   date: string | null;
   title: string;
   customer_attendees: Array<{ name: string; title: string; company: string }>;
   health: 'green' | 'yellow' | 'red';
+  questions: ParsedQuestion[];
 }
 
 export interface ExtractedCall {
@@ -84,6 +100,23 @@ export function extractMetadata(raw: string): ExtractedCall {
   // Ensure customer_attendees is an array
   if (!Array.isArray(metadata.customer_attendees)) {
     metadata.customer_attendees = [];
+  }
+
+  // Normalize questions: must be an array of {asker_name, question_text} objects
+  if (!Array.isArray(metadata.questions)) {
+    metadata.questions = [];
+  } else {
+    metadata.questions = metadata.questions.filter(
+      (q): q is ParsedQuestion => {
+        if (q === null || typeof q !== 'object') return false;
+        const o = q as unknown as Record<string, unknown>;
+        return typeof o['asker_name'] === 'string' && typeof o['question_text'] === 'string';
+      }
+    );
+    // Cap at 15
+    if (metadata.questions.length > 15) {
+      metadata.questions = metadata.questions.slice(0, 15);
+    }
   }
 
   return { plainText, metadata };

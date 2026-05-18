@@ -54,6 +54,27 @@ export interface Call {
   updated_at: number | null;
 }
 
+export interface Question {
+  id: string;
+  account_id: string;
+  call_id: string;
+  asker_name: string;
+  asker_stakeholder_id: string | null;
+  question_text: string;
+  status: 'open' | 'answered' | 'deferred';
+  resolution_text: string | null;
+  resolution_call_id: string | null;
+  asked_at: string | null;
+  resolved_at: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface QuestionWithContext extends Question {
+  account_name: string;
+  call_title: string | null;
+}
+
 export interface CallAttendee {
   name: string;
   title: string;

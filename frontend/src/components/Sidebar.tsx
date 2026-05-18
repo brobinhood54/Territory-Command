@@ -9,7 +9,10 @@ interface SidebarProps {
   loading: boolean;
   selectedId: string | null;
   collapsed: boolean;
+  activeView: 'account' | 'openLoops';
+  openLoopsCount: number;
   onSelect: (id: string) => void;
+  onSelectOpenLoops: () => void;
   onToggleCollapse: () => void;
 }
 
@@ -51,7 +54,8 @@ function formatAmount(amount: number): string {
 // ---
 
 export default function Sidebar({
-  accounts, loading, selectedId, collapsed, onSelect, onToggleCollapse,
+  accounts, loading, selectedId, collapsed, activeView, openLoopsCount,
+  onSelect, onSelectOpenLoops, onToggleCollapse,
 }: SidebarProps) {
   const [search, setSearch] = useState('');
   const [industryFilter, setIndustryFilter] = useState('All');
@@ -200,6 +204,47 @@ export default function Sidebar({
       {/* Content: only shown when expanded */}
       {!collapsed && (
         <>
+          {/* Open Loops row */}
+          <button
+            onClick={onSelectOpenLoops}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              width: '100%',
+              padding: '0.5rem 0.75rem',
+              background: activeView === 'openLoops' ? '#162032' : 'transparent',
+              border: 'none',
+              borderBottom: '1px solid #1e3048',
+              borderLeft: `3px solid ${activeView === 'openLoops' ? '#00c2d4' : 'transparent'}`,
+              cursor: 'pointer',
+              textAlign: 'left',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{
+              fontSize: '0.8rem',
+              fontWeight: activeView === 'openLoops' ? 700 : 500,
+              color: activeView === 'openLoops' ? '#00c2d4' : '#9db8cc',
+              flex: 1,
+            }}>
+              Open Loops
+            </span>
+            {openLoopsCount > 0 && (
+              <span style={{
+                background: '#00c2d4',
+                color: '#080e1a',
+                fontSize: '0.65rem',
+                fontWeight: 700,
+                borderRadius: '999px',
+                padding: '0.1rem 0.45rem',
+                minWidth: '18px',
+                textAlign: 'center',
+              }}>
+                {openLoopsCount}
+              </span>
+            )}
+          </button>
+
           {/* Search */}
           <div style={{ padding: '0.625rem 0.625rem 0', flexShrink: 0 }}>
             <input

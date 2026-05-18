@@ -61,6 +61,24 @@ export async function runMigrations(): Promise<void> {
       updated_at INTEGER
     )
   `);
+
+  await libsqlClient.execute(`
+    CREATE TABLE IF NOT EXISTS questions (
+      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES accounts(id),
+      call_id TEXT NOT NULL REFERENCES calls(id),
+      asker_name TEXT NOT NULL,
+      asker_stakeholder_id TEXT REFERENCES stakeholders(id),
+      question_text TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      resolution_text TEXT,
+      resolution_call_id TEXT REFERENCES calls(id),
+      asked_at TEXT,
+      resolved_at TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `);
 }
 
 if (require.main === module) {

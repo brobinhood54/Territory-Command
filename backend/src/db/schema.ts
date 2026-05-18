@@ -39,6 +39,22 @@ export const stakeholders = sqliteTable('stakeholders', {
   updated_at: integer('updated_at'),
 });
 
+export const questions = sqliteTable('questions', {
+  id: text('id').primaryKey(),
+  account_id: text('account_id').references(() => accounts.id).notNull(),
+  call_id: text('call_id').references(() => calls.id).notNull(),
+  asker_name: text('asker_name').notNull(),
+  asker_stakeholder_id: text('asker_stakeholder_id').references(() => stakeholders.id),
+  question_text: text('question_text').notNull(),
+  status: text('status').default('open').notNull(),
+  resolution_text: text('resolution_text'),
+  resolution_call_id: text('resolution_call_id').references(() => calls.id),
+  asked_at: text('asked_at'),
+  resolved_at: text('resolved_at'),
+  created_at: integer('created_at').notNull(),
+  updated_at: integer('updated_at').notNull(),
+});
+
 export const calls = sqliteTable('calls', {
   id: text('id').primaryKey(),
   account_id: text('account_id').references(() => accounts.id).notNull(),

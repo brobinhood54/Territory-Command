@@ -1,4 +1,4 @@
-import type { Account, Stakeholder, Call, CallUploadResponse, CallReparseResponse } from '@tc/shared';
+import type { Account, Stakeholder, Call, CallUploadResponse, CallReparseResponse, Question, QuestionWithContext } from '@tc/shared';
 
 const BASE = '/api';
 
@@ -140,6 +140,32 @@ export const api = {
       request<{ success: boolean }>(`/calls/${id}`, { method: 'DELETE' }),
     reparse: (id: string) =>
       request<CallReparseResponse>(`/calls/${id}/reparse`, { method: 'POST' }),
+  },
+  questions: {
+    listForAccount: (accountId: string) =>
+      request<Question[]>(`/accounts/${accountId}/questions`),
+    listOpen: () =>
+      request<QuestionWithContext[]>('/questions/open'),
+    update: (id: string, patch: {
+      status?: 'open' | 'answered' | 'deferred';
+      resolution_text?: string | null;
+      question_text?: string;
+      asker_name?: string;
+      asker_stakeholder_id?: string | null;
+    }) =>
+      request<Question>(`/questions/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      }),
+    linkStakeholder: (id: string, stakeholderId: string | null) =>
+      request<Question>(`/questions/${id}/link-stakeholder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stakeholderId }),
+      }),
+    delete: (id: string) =>
+      request<{ success: boolean }>(`/questions/${id}`, { method: 'DELETE' }),
   },
   data: { exportData, importData, backupNow },
 };
