@@ -53,3 +53,34 @@ export interface Call {
   created_at: number | null;
   updated_at: number | null;
 }
+
+export interface CallAttendee {
+  name: string;
+  title: string;
+  company: string;
+}
+
+export type CallUploadFileResult =
+  | {
+      ok: true;
+      filename: string;
+      call: Call;
+      attendeesSeeded: number;
+      attendeesMerged: number;
+    }
+  | {
+      ok: false;
+      filename: string;
+      error: string;
+    };
+
+export interface CallUploadResponse {
+  results: CallUploadFileResult[];
+  summary: { succeeded: number; failed: number };
+}
+
+export interface CallReparseResponse {
+  call: Call;
+  attendeesSeeded: number;
+  attendeesMerged: number;
+}

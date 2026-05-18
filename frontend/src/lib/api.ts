@@ -1,4 +1,4 @@
-import type { Account, Stakeholder } from '@tc/shared';
+import type { Account, Stakeholder, Call, CallUploadResponse, CallReparseResponse } from '@tc/shared';
 
 const BASE = '/api';
 
@@ -30,6 +30,13 @@ export type StakeholderDraft = {
 };
 
 export type StakeholderPatch = Partial<StakeholderDraft>;
+
+export type CallPatch = {
+  title?: string;
+  date?: string | null;
+  summary?: string;
+  health?: string;
+};
 
 export const api = {
   accounts: {
@@ -65,5 +72,29 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetId }),
       }),
+  },
+  calls: {
+    list: (accountId: string) =>
+      request<Call[]>(`/accounts/${accountId}/calls`),
+    get: (id: string) =>
+      request<Call>(`/calls/${id}`),
+    upload: (accountId: string, files: File[]) => {
+      const formData = new FormData();
+      files.forEach(f => formData.append('files', f));
+      return request<CallUploadResponse>(`/accounts/${accountId}/calls/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+    },
+    update: (id: string, patch: CallPatch) =>
+      request<Call>(`/calls/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      }),
+    delete: (id: string) =>
+      request<{ success: boolean }>(`/calls/${id}`, { method: 'DELETE' }),
+    reparse: (id: string) =>
+      request<CallReparseResponse>(`/calls/${id}/reparse`, { method: 'POST' }),
   },
 };
