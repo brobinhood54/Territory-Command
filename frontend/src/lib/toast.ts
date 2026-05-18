@@ -6,13 +6,15 @@ export interface Toast {
   id: string;
   type: ToastType;
   message: string;
+  quiet?: boolean;
 }
 
 const DISMISS_DELAY: Record<ToastType, number> = {
-  success: 12000,
+  success: 4000,
   warning: 12000,
-  error: 20000,
+  error: 8000,
 };
+const QUIET_DISMISS_DELAY = 1500;
 
 // Module-level singleton so all useToast() calls share the same state
 let toasts: Toast[] = [];
@@ -32,12 +34,14 @@ function getSnapshot(): Toast[] {
   return toasts;
 }
 
-export function showToast(type: ToastType, message: string): void {
+export function showToast(type: ToastType, message: string, opts?: { quiet?: boolean }): void {
   const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-  toasts = [...toasts, { id, type, message }];
+  const quiet = opts?.quiet ?? false;
+  toasts = [...toasts, { id, type, message, quiet }];
   notify();
 
-  const timer = setTimeout(() => dismissToast(id), DISMISS_DELAY[type]);
+  const delay = quiet ? QUIET_DISMISS_DELAY : DISMISS_DELAY[type];
+  const timer = setTimeout(() => dismissToast(id), delay);
   timers.set(id, timer);
 }
 

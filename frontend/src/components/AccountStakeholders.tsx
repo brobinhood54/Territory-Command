@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import type { Stakeholder } from '@tc/shared';
 import { api } from '../lib/api';
+import { showToast } from '../lib/toast';
+import { useConfirm } from './ConfirmModal';
 
 // ---- constants ----
 
@@ -433,6 +435,7 @@ interface StakeholderCardProps {
 function StakeholderCard({
   stakeholder, allStakeholders, focusName, onUpdate, onDelete, onMerge,
 }: StakeholderCardProps) {
+  const confirm = useConfirm();
   const [editingField, setEditingField] = useState<string | null>(focusName ? 'name' : null);
   const [editValues, setEditValues] = useState<Record<string, string>>({
     name: stakeholder.name,
@@ -490,8 +493,10 @@ function StakeholderCard({
       const updated = await api.stakeholders.update(stakeholder.id, patch);
       onUpdate(updated);
       flashSaved(field);
+      showToast('success', 'Saved', { quiet: true });
     } catch (err) {
       console.error('Failed to save:', err);
+      showToast('error', err instanceof Error ? err.message : 'Failed to save');
     }
   }
 
@@ -501,8 +506,10 @@ function StakeholderCard({
       const updated = await api.stakeholders.update(stakeholder.id, { temperature: value });
       onUpdate(updated);
       flashSaved('temperature');
+      showToast('success', 'Saved', { quiet: true });
     } catch (err) {
       console.error('Failed to save:', err);
+      showToast('error', err instanceof Error ? err.message : 'Failed to save');
     }
   }
 
@@ -512,8 +519,10 @@ function StakeholderCard({
       const updated = await api.stakeholders.update(stakeholder.id, { type: value });
       onUpdate(updated);
       flashSaved('type');
+      showToast('success', 'Saved', { quiet: true });
     } catch (err) {
       console.error('Failed to save:', err);
+      showToast('error', err instanceof Error ? err.message : 'Failed to save');
     }
   }
 
@@ -523,14 +532,21 @@ function StakeholderCard({
       const updated = await api.stakeholders.update(stakeholder.id, { championConfirmed: newVal });
       onUpdate(updated);
       flashSaved('champion_confirmed');
+      showToast('success', 'Saved', { quiet: true });
     } catch (err) {
       console.error('Failed to save:', err);
+      showToast('error', err instanceof Error ? err.message : 'Failed to save');
     }
   }
 
-  function handleDelete() {
-    const confirmed = window.confirm(`Delete ${stakeholder.name}? This cannot be undone.`);
-    if (confirmed) onDelete(stakeholder.id);
+  async function handleDeleteClick() {
+    const ok = await confirm({
+      title: `Delete ${stakeholder.name}?`,
+      body: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (ok) onDelete(stakeholder.id);
   }
 
   const typeColor = TYPE_COLOR[stakeholder.type ?? 'Unclassified'] ?? TYPE_COLOR.Unclassified;
@@ -585,7 +601,7 @@ function StakeholderCard({
             onSelect={handleTempSelect}
           />
           <button
-            onClick={handleDelete}
+            onClick={handleDeleteClick}
             title="Delete"
             style={{
               background: 'none',
@@ -767,7 +783,7 @@ export default function AccountStakeholders({ accountId }: AccountStakeholdersPr
     setLoading(true);
     api.stakeholders.list(accountId)
       .then(rows => { setStakeholders(rows); setLoading(false); })
-      .catch(err => { console.error('Failed to load stakeholders:', err); setLoading(false); });
+      .catch(err => { console.error('Failed to load stakeholders:', err); setLoading(false); showToast('error', 'Failed to load stakeholders'); });
   }, [accountId]);
 
   async function handleAdd() {
@@ -775,8 +791,10 @@ export default function AccountStakeholders({ accountId }: AccountStakeholdersPr
       const created = await api.stakeholders.create(accountId, { name: '(new stakeholder)' });
       setStakeholders(prev => [...prev, created]);
       setNewId(created.id);
+      showToast('success', 'Stakeholder added');
     } catch (err) {
       console.error('Failed to create stakeholder:', err);
+      showToast('error', err instanceof Error ? err.message : 'Failed to add stakeholder');
     }
   }
 
@@ -789,8 +807,10 @@ export default function AccountStakeholders({ accountId }: AccountStakeholdersPr
     try {
       await api.stakeholders.delete(id);
       setStakeholders(prev => prev.filter(s => s.id !== id));
+      showToast('success', 'Stakeholder deleted');
     } catch (err) {
       console.error('Failed to delete:', err);
+      showToast('error', err instanceof Error ? err.message : 'Failed to delete stakeholder');
     }
   }
 
@@ -800,8 +820,10 @@ export default function AccountStakeholders({ accountId }: AccountStakeholdersPr
       setStakeholders(prev =>
         prev.filter(s => s.id !== sourceId).map(s => s.id === targetId ? updated : s)
       );
+      showToast('success', 'Stakeholders merged');
     } catch (err) {
       console.error('Failed to merge:', err);
+      showToast('error', err instanceof Error ? err.message : 'Failed to merge stakeholders');
     }
   }
 
