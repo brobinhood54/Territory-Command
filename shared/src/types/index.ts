@@ -16,6 +16,7 @@ export interface Account {
   archived: boolean | null;
   created_at: number | null;
   updated_at: number | null;
+  deal_health?: string | null;
 }
 
 export interface Stakeholder {
