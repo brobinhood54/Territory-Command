@@ -55,6 +55,29 @@ export const questions = sqliteTable('questions', {
   updated_at: integer('updated_at').notNull(),
 });
 
+export const pains = sqliteTable('pains', {
+  id: text('id').primaryKey(),
+  account_id: text('account_id').references(() => accounts.id).notNull(),
+  summary: text('summary').notNull(),
+  category: text('category').notNull(),
+  confidence: text('confidence').notNull().default('medium'),
+  first_heard_at: text('first_heard_at'),
+  last_heard_at: text('last_heard_at'),
+  created_at: integer('created_at').notNull(),
+  updated_at: integer('updated_at').notNull(),
+});
+
+export const pain_sources = sqliteTable('pain_sources', {
+  id: text('id').primaryKey(),
+  pain_id: text('pain_id').references(() => pains.id).notNull(),
+  call_id: text('call_id').references(() => calls.id).notNull(),
+  voicer_name: text('voicer_name').notNull(),
+  voicer_stakeholder_id: text('voicer_stakeholder_id').references(() => stakeholders.id),
+  quote: text('quote').notNull(),
+  confidence: text('confidence').notNull().default('medium'),
+  created_at: integer('created_at').notNull(),
+});
+
 export const calls = sqliteTable('calls', {
   id: text('id').primaryKey(),
   account_id: text('account_id').references(() => accounts.id).notNull(),

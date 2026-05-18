@@ -10,6 +10,7 @@ import { accountRoutes } from './routes/accounts';
 import { stakeholderRoutes } from './routes/stakeholders';
 import { callRoutes } from './routes/calls';
 import { questionRoutes } from './routes/questions';
+import { painRoutes } from './routes/pains';
 import { backupRoutes } from './routes/backup';
 
 async function main() {
@@ -22,6 +23,7 @@ async function main() {
   app.route('/api', stakeholderRoutes);
   app.route('/api', callRoutes);
   app.route('/api', questionRoutes);
+  app.route('/api', painRoutes);
   app.route('/api', backupRoutes);
 
   const port = 3001;

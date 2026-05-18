@@ -63,6 +63,33 @@ export async function runMigrations(): Promise<void> {
   `);
 
   await libsqlClient.execute(`
+    CREATE TABLE IF NOT EXISTS pains (
+      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES accounts(id),
+      summary TEXT NOT NULL,
+      category TEXT NOT NULL,
+      confidence TEXT NOT NULL DEFAULT 'medium',
+      first_heard_at TEXT,
+      last_heard_at TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `);
+
+  await libsqlClient.execute(`
+    CREATE TABLE IF NOT EXISTS pain_sources (
+      id TEXT PRIMARY KEY,
+      pain_id TEXT NOT NULL REFERENCES pains(id),
+      call_id TEXT NOT NULL REFERENCES calls(id),
+      voicer_name TEXT NOT NULL,
+      voicer_stakeholder_id TEXT REFERENCES stakeholders(id),
+      quote TEXT NOT NULL,
+      confidence TEXT NOT NULL DEFAULT 'medium',
+      created_at INTEGER NOT NULL
+    )
+  `);
+
+  await libsqlClient.execute(`
     CREATE TABLE IF NOT EXISTS questions (
       id TEXT PRIMARY KEY,
       account_id TEXT NOT NULL REFERENCES accounts(id),

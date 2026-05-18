@@ -16,6 +16,7 @@ export default function TabBar({ tabs, activeTab, onChange }: TabBarProps) {
       borderBottom: '1px solid #1e3048',
       background: '#0a1220',
       flexShrink: 0,
+      overflowX: 'auto',
     }}>
       {tabs.map(tab => {
         const isActive = tab.key === activeTab;

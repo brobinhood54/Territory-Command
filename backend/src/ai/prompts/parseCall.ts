@@ -20,6 +20,9 @@ QUESTIONS RAISED
 - [{asker_name}] {question text}
 - [{asker_name}] {question text}
 
+PAIN POINTS
+- [{category}] {voicer_name}: "{verbatim quote or close paraphrase}" -- {1-sentence summary of the pain}
+
 ACTION ITEMS
 - [{owner first name or "Brendan"}] {action} (by {date if mentioned, otherwise omit the parenthetical})
 
@@ -39,6 +42,15 @@ NEXT STEP
   "health": "{green|yellow|red}",
   "questions": [
     {"asker_name": "Sarah Chen", "question_text": "How does your platform handle service accounts in legacy systems?"}
+  ],
+  "pains": [
+    {
+      "summary": "Service account sprawl in legacy AD creates audit failures",
+      "category": "nhi",
+      "voicer_name": "Sarah Chen",
+      "quote": "We have thousands of service accounts in AD and we can't tell which ones are still being used by anything",
+      "confidence": "high"
+    }
   ]
 }
 </metadata>
@@ -53,11 +65,26 @@ RULES:
 7. If the transcript is a short or incomplete recording, do your best with what is available. Do not fabricate information.
 8. "questions" must be an array (empty array if none). Each entry has "asker_name" and "question_text". Include 0 to 15 questions per call. A question qualifies if: (a) a customer participant asked something that needs an answer from Oasis, (b) a customer raised an objection or concern that needs follow-up, or (c) a customer flagged an open issue. Exclude rhetorical questions and questions Brendan or Oasis employees asked. Do NOT include every interrogative sentence. Only record questions that represent a genuine open loop.
 9. "asker_name" in the questions array must exactly match the name as written in the ATTENDEES section. We fuzzy-match downstream but exact match is preferred.
-10. If QUESTIONS RAISED has no entries, write "None." under the section header in the plain text and return an empty array in the metadata.`;
+10. If QUESTIONS RAISED has no entries, write "None." under the section header in the plain text and return an empty array in the metadata.
+11. "pains" must be an array (empty array if none). Include 0 to 12 pains per call. A pain qualifies if: a customer-side person voiced a specific problem, frustration, risk, or unmet need. A pain is NOT a question, NOT an action item, NOT a positive comment about Oasis.
+12. Only extract pains voiced by customer-side people. Exclude anything Brendan Robinson or Oasis Security employees said.
+13. Pain category guidance -- pick exactly one: "nhi" (non-human/service/machine identities, credentials, secrets, certs, API keys), "agentic" (AI agents, automated workflows, autonomous systems), "compliance" (SOX, PCI, audit, regulatory, attestation, evidence collection), "operational" (scale, manual work, fragmented tools, visibility gaps not strictly NHI or compliance), "strategic" (business outcomes, risk posture, board-level concerns).
+14. Pain confidence: "high" = customer used specific, concrete language (numbers, examples, named systems); "medium" = customer acknowledged the pain in general terms; "low" = pain was implied or hinted at, not explicitly voiced.
+15. "quote" should be a verbatim sentence from the transcript when possible. If summarizing, keep it under 200 chars and stay in the customer's voice. Do not paraphrase into third person.
+16. "voicer_name" must exactly match the name as written in the ATTENDEES section.
+17. If PAIN POINTS has no entries, write "None." under the section header in the plain text and return an empty array in the metadata.`;
 
 export interface ParsedQuestion {
   asker_name: string;
   question_text: string;
+}
+
+export interface ParsedPain {
+  summary: string;
+  category: 'nhi' | 'agentic' | 'compliance' | 'operational' | 'strategic';
+  voicer_name: string;
+  quote: string;
+  confidence: 'high' | 'medium' | 'low';
 }
 
 export interface ParsedMetadata {
@@ -66,6 +93,7 @@ export interface ParsedMetadata {
   customer_attendees: Array<{ name: string; title: string; company: string }>;
   health: 'green' | 'yellow' | 'red';
   questions: ParsedQuestion[];
+  pains: ParsedPain[];
 }
 
 export interface ExtractedCall {
@@ -116,6 +144,31 @@ export function extractMetadata(raw: string): ExtractedCall {
     // Cap at 15
     if (metadata.questions.length > 15) {
       metadata.questions = metadata.questions.slice(0, 15);
+    }
+  }
+
+  // Normalize pains: must be an array of {summary, category, voicer_name, quote, confidence}
+  const VALID_CATEGORIES = new Set(['nhi', 'agentic', 'compliance', 'operational', 'strategic']);
+  const VALID_CONFIDENCE = new Set(['high', 'medium', 'low']);
+  if (!Array.isArray(metadata.pains)) {
+    metadata.pains = [];
+  } else {
+    metadata.pains = metadata.pains.filter(
+      (p): p is ParsedPain => {
+        if (p === null || typeof p !== 'object') return false;
+        const o = p as unknown as Record<string, unknown>;
+        return (
+          typeof o['summary'] === 'string' && o['summary'].trim() !== '' &&
+          typeof o['category'] === 'string' && VALID_CATEGORIES.has(o['category'] as string) &&
+          typeof o['voicer_name'] === 'string' && o['voicer_name'].trim() !== '' &&
+          typeof o['quote'] === 'string' && o['quote'].trim() !== '' &&
+          typeof o['confidence'] === 'string' && VALID_CONFIDENCE.has(o['confidence'] as string)
+        );
+      }
+    );
+    // Cap at 12
+    if (metadata.pains.length > 12) {
+      metadata.pains = metadata.pains.slice(0, 12);
     }
   }
 

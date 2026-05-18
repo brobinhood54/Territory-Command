@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 import { eq, desc, and } from 'drizzle-orm';
 import { db } from '../db/client';
-import { calls, stakeholders, questions } from '../db/schema';
+import { calls, stakeholders, questions, pains, pain_sources } from '../db/schema';
 import { parseFile } from '../lib/parseFile';
 import { callClaude } from '../ai/client';
 import { CALL_PARSE_SYSTEM, extractMetadata } from '../ai/prompts/parseCall';
 import { fuzzyMatchName, fuzzyMatchText } from '../lib/fuzzyMatch';
-import type { ParsedQuestion } from '../ai/prompts/parseCall';
+import type { ParsedQuestion, ParsedPain } from '../ai/prompts/parseCall';
 
 export const callRoutes = new Hono();
 
@@ -174,6 +174,251 @@ async function reparseQuestions(
   return { inserted, preserved };
 }
 
+// ---- pain seeding helpers ----
+
+type PainRow = typeof pains.$inferSelect;
+type PainSourceRow = typeof pain_sources.$inferSelect;
+
+// Fuzzy-match a new pain summary against existing pains on this account.
+// Use a higher threshold (0.75) than questions because pain summaries are short.
+const PAIN_DEDUP_THRESHOLD = 0.75;
+
+async function seedPains(
+  accountId: string,
+  callId: string,
+  callDate: string | null,
+  parsedPains: ParsedPain[],
+  accountStakeholders: StakeholderRow[]
+): Promise<number> {
+  const existingPains: PainRow[] = await db
+    .select()
+    .from(pains)
+    .where(eq(pains.account_id, accountId));
+
+  let seeded = 0;
+
+  for (const pp of parsedPains) {
+    if (!pp.summary.trim() || !pp.quote.trim()) continue;
+
+    // Try to match the incoming summary against all existing pain summaries on this account
+    const matchedSummary = fuzzyMatchText(
+      pp.summary,
+      existingPains.map(p => p.summary),
+      PAIN_DEDUP_THRESHOLD
+    );
+    const matchedPain = matchedSummary
+      ? existingPains.find(p => p.summary === matchedSummary) ?? null
+      : null;
+
+    // Fuzzy-match voicer to a stakeholder
+    const matchedStakeholderName = fuzzyMatchName(pp.voicer_name, accountStakeholders.map(s => s.name));
+    const voicerStakeholderId = matchedStakeholderName
+      ? (accountStakeholders.find(s => s.name === matchedStakeholderName)?.id ?? null)
+      : null;
+
+    const now = Date.now();
+    const rand = () => Math.random().toString(36).slice(2, 7);
+
+    if (matchedPain) {
+      // Pain already exists: add a new source, update last_heard_at if newer
+      const sourceId = `ps-${callId}-${now}-${rand()}`;
+      await db.insert(pain_sources).values({
+        id: sourceId,
+        pain_id: matchedPain.id,
+        call_id: callId,
+        voicer_name: pp.voicer_name.trim(),
+        voicer_stakeholder_id: voicerStakeholderId,
+        quote: pp.quote.trim(),
+        confidence: pp.confidence,
+        created_at: now,
+      });
+
+      if (callDate && (!matchedPain.last_heard_at || callDate > matchedPain.last_heard_at)) {
+        await db.update(pains).set({ last_heard_at: callDate, updated_at: now })
+          .where(eq(pains.id, matchedPain.id));
+        // Keep in-memory list in sync
+        matchedPain.last_heard_at = callDate;
+      }
+    } else {
+      // New pain: insert pain row then source row
+      const painId = `p-${accountId}-${now}-${rand()}`;
+      const newPain: typeof pains.$inferInsert = {
+        id: painId,
+        account_id: accountId,
+        summary: pp.summary.trim(),
+        category: pp.category,
+        confidence: pp.confidence,
+        first_heard_at: callDate ?? null,
+        last_heard_at: callDate ?? null,
+        created_at: now,
+        updated_at: now,
+      };
+      await db.insert(pains).values(newPain);
+      existingPains.push(newPain as PainRow);
+
+      const sourceId = `ps-${callId}-${now}-${rand()}`;
+      await db.insert(pain_sources).values({
+        id: sourceId,
+        pain_id: painId,
+        call_id: callId,
+        voicer_name: pp.voicer_name.trim(),
+        voicer_stakeholder_id: voicerStakeholderId,
+        quote: pp.quote.trim(),
+        confidence: pp.confidence,
+        created_at: now,
+      });
+
+      seeded++;
+    }
+  }
+
+  return seeded;
+}
+
+async function reparsePains(
+  accountId: string,
+  callId: string,
+  callDate: string | null,
+  parsedPains: ParsedPain[],
+  accountStakeholders: StakeholderRow[]
+): Promise<{ inserted: number; preserved: number }> {
+  // Load all existing pain_sources for this call
+  const existingSourcesOnCall: PainSourceRow[] = await db
+    .select()
+    .from(pain_sources)
+    .where(eq(pain_sources.call_id, callId));
+
+  // Load all existing pains for this account (for cross-call dedup)
+  const existingPains: PainRow[] = await db
+    .select()
+    .from(pains)
+    .where(eq(pains.account_id, accountId));
+
+  const matchedSourceIds = new Set<string>();
+  let inserted = 0;
+  let preserved = 0;
+
+  for (const pp of parsedPains) {
+    if (!pp.summary.trim() || !pp.quote.trim()) continue;
+
+    // First: try to match against an existing source on this call by quote similarity
+    const unmatchedSources = existingSourcesOnCall.filter(s => !matchedSourceIds.has(s.id));
+    const matchedQuote = fuzzyMatchText(pp.quote, unmatchedSources.map(s => s.quote), 0.6);
+    const matchedSource = matchedQuote
+      ? unmatchedSources.find(s => s.quote === matchedQuote) ?? null
+      : null;
+
+    const matchedStakeholderName = fuzzyMatchName(pp.voicer_name, accountStakeholders.map(s => s.name));
+    const voicerStakeholderId = matchedStakeholderName
+      ? (accountStakeholders.find(s => s.name === matchedStakeholderName)?.id ?? null)
+      : null;
+
+    const now = Date.now();
+    const rand = () => Math.random().toString(36).slice(2, 7);
+
+    if (matchedSource) {
+      // Update the existing source's fields; leave parent pain summary alone
+      matchedSourceIds.add(matchedSource.id);
+      await db.update(pain_sources).set({
+        voicer_name: pp.voicer_name.trim(),
+        voicer_stakeholder_id: voicerStakeholderId,
+        quote: pp.quote.trim(),
+        confidence: pp.confidence,
+      }).where(eq(pain_sources.id, matchedSource.id));
+      preserved++;
+    } else {
+      // New pain mention: run full upload logic (dedup against all account pains, create if needed)
+      const matchedSummary = fuzzyMatchText(
+        pp.summary,
+        existingPains.map(p => p.summary),
+        PAIN_DEDUP_THRESHOLD
+      );
+      const matchedPain = matchedSummary
+        ? existingPains.find(p => p.summary === matchedSummary) ?? null
+        : null;
+
+      if (matchedPain) {
+        const sourceId = `ps-${callId}-${now}-${rand()}`;
+        await db.insert(pain_sources).values({
+          id: sourceId,
+          pain_id: matchedPain.id,
+          call_id: callId,
+          voicer_name: pp.voicer_name.trim(),
+          voicer_stakeholder_id: voicerStakeholderId,
+          quote: pp.quote.trim(),
+          confidence: pp.confidence,
+          created_at: now,
+        });
+        if (callDate && (!matchedPain.last_heard_at || callDate > matchedPain.last_heard_at)) {
+          await db.update(pains).set({ last_heard_at: callDate, updated_at: now })
+            .where(eq(pains.id, matchedPain.id));
+          matchedPain.last_heard_at = callDate;
+        }
+      } else {
+        const painId = `p-${accountId}-${now}-${rand()}`;
+        const newPain: typeof pains.$inferInsert = {
+          id: painId,
+          account_id: accountId,
+          summary: pp.summary.trim(),
+          category: pp.category,
+          confidence: pp.confidence,
+          first_heard_at: callDate ?? null,
+          last_heard_at: callDate ?? null,
+          created_at: now,
+          updated_at: now,
+        };
+        await db.insert(pains).values(newPain);
+        existingPains.push(newPain as PainRow);
+
+        const sourceId = `ps-${callId}-${now}-${rand()}`;
+        await db.insert(pain_sources).values({
+          id: sourceId,
+          pain_id: painId,
+          call_id: callId,
+          voicer_name: pp.voicer_name.trim(),
+          voicer_stakeholder_id: voicerStakeholderId,
+          quote: pp.quote.trim(),
+          confidence: pp.confidence,
+          created_at: now,
+        });
+        inserted++;
+      }
+    }
+  }
+
+  // Recompute first/last heard for any pain that had sources on this call
+  const touchedPainIds = new Set(existingSourcesOnCall.map(s => s.pain_id));
+  for (const painId of touchedPainIds) {
+    const allSources = await db
+      .select({ call_id: pain_sources.call_id })
+      .from(pain_sources)
+      .where(eq(pain_sources.pain_id, painId));
+
+    const callIds = allSources.map(s => s.call_id);
+    if (callIds.length === 0) continue;
+
+    // Fetch dates for all calls
+    const callDates: string[] = [];
+    for (const cid of callIds) {
+      const row = existingPains.find(() => false); // placeholder
+      void row;
+      const callRow = (await db.select({ date: calls.date }).from(calls).where(eq(calls.id, cid)))[0];
+      if (callRow?.date) callDates.push(callRow.date);
+    }
+
+    if (callDates.length > 0) {
+      const sorted = [...callDates].sort();
+      await db.update(pains).set({
+        first_heard_at: sorted[0],
+        last_heard_at: sorted[sorted.length - 1],
+        updated_at: Date.now(),
+      }).where(eq(pains.id, painId));
+    }
+  }
+
+  return { inserted, preserved };
+}
+
 // ---- POST /api/accounts/:accountId/calls/upload ----
 
 callRoutes.post('/accounts/:accountId/calls/upload', async (c) => {
@@ -264,8 +509,16 @@ callRoutes.post('/accounts/:accountId/calls/upload', async (c) => {
         existingStakeholders
       );
 
+      const painsSeeded = await seedPains(
+        accountId,
+        id,
+        metadata.date ?? null,
+        metadata.pains ?? [],
+        existingStakeholders
+      );
+
       const created = (await db.select().from(calls).where(eq(calls.id, id)))[0];
-      results.push({ ok: true, filename, call: created, attendeesSeeded: seeded, attendeesMerged: merged, questionsSeeded });
+      results.push({ ok: true, filename, call: created, attendeesSeeded: seeded, attendeesMerged: merged, questionsSeeded, painsSeeded });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[calls/upload] failed for "${filename}":`, message);
@@ -403,6 +656,14 @@ callRoutes.post('/calls/:id/reparse', async (c) => {
     updatedList
   );
 
+  const { inserted: painsInserted, preserved: painsPreserved } = await reparsePains(
+    existing.account_id,
+    id,
+    metadata.date ?? null,
+    metadata.pains ?? [],
+    updatedList
+  );
+
   const updated = (await db.select().from(calls).where(eq(calls.id, id)))[0];
-  return c.json({ call: updated, attendeesSeeded: seeded, attendeesMerged: merged, questionsInserted, questionsPreserved });
+  return c.json({ call: updated, attendeesSeeded: seeded, attendeesMerged: merged, questionsInserted, questionsPreserved, painsInserted, painsPreserved });
 });
