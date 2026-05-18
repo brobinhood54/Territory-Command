@@ -12,6 +12,7 @@ import { callRoutes } from './routes/calls';
 import { questionRoutes } from './routes/questions';
 import { painRoutes } from './routes/pains';
 import { backupRoutes } from './routes/backup';
+import { gameplanRoutes } from './routes/gameplans';
 
 async function main() {
   await runMigrations();
@@ -25,6 +26,7 @@ async function main() {
   app.route('/api', questionRoutes);
   app.route('/api', painRoutes);
   app.route('/api', backupRoutes);
+  app.route('/api', gameplanRoutes);
 
   const port = 3001;
   serve({ fetch: app.fetch, port }, () => {

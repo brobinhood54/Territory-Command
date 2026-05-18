@@ -90,6 +90,20 @@ export async function runMigrations(): Promise<void> {
   `);
 
   await libsqlClient.execute(`
+    CREATE TABLE IF NOT EXISTS gameplans (
+      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES accounts(id),
+      content TEXT NOT NULL,
+      model_used TEXT,
+      generated_at INTEGER,
+      input_tokens INTEGER,
+      output_tokens INTEGER,
+      latency_ms INTEGER,
+      generated_with_data_signature TEXT
+    )
+  `);
+
+  await libsqlClient.execute(`
     CREATE TABLE IF NOT EXISTS questions (
       id TEXT PRIMARY KEY,
       account_id TEXT NOT NULL REFERENCES accounts(id),

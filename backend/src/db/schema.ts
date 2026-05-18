@@ -78,6 +78,18 @@ export const pain_sources = sqliteTable('pain_sources', {
   created_at: integer('created_at').notNull(),
 });
 
+export const gameplans = sqliteTable('gameplans', {
+  id: text('id').primaryKey(),
+  account_id: text('account_id').references(() => accounts.id).notNull(),
+  content: text('content').notNull(),
+  model_used: text('model_used'),
+  generated_at: integer('generated_at'),
+  input_tokens: integer('input_tokens'),
+  output_tokens: integer('output_tokens'),
+  latency_ms: integer('latency_ms'),
+  generated_with_data_signature: text('generated_with_data_signature'),
+});
+
 export const calls = sqliteTable('calls', {
   id: text('id').primaryKey(),
   account_id: text('account_id').references(() => accounts.id).notNull(),

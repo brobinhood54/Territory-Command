@@ -117,6 +117,64 @@ export interface PainEnriched extends Pain {
   voicers: PainVoicer[];
 }
 
+export interface GameplanPathItem {
+  action: string;
+  owner: string;
+  date: string;
+}
+
+export interface GameplanRisk {
+  severity: 'critical' | 'high' | 'medium';
+  title: string;
+  description: string;
+  evidence: string;
+  action: string;
+}
+
+export interface GameplanStakeholderPosture {
+  name: string;
+  stakeholder_id: string | null;
+  type: string;
+  stance: 'advocate' | 'supportive' | 'neutral' | 'skeptical' | 'blocking' | 'unknown';
+  stanceReason: string;
+  watchFor: string;
+}
+
+export interface GameplanContent {
+  headline: string;
+  trajectory: 'advancing' | 'stalled' | 'at_risk' | 'regressing';
+  trajectoryReason: string;
+  risks: GameplanRisk[];
+  story: string;
+  currentState: {
+    stage: string;
+    decisionMakers: string;
+    openQuestions: string;
+    topPains: string;
+  };
+  pathToClose: {
+    p0: GameplanPathItem[];
+    p1: GameplanPathItem[];
+    p2: GameplanPathItem[];
+  };
+  stakeholderPosture: GameplanStakeholderPosture[];
+}
+
+export interface GameplanListEntry {
+  id: string;
+  account_id: string;
+  model_used: string | null;
+  generated_at: number | null;
+  latency_ms: number | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  generated_with_data_signature: string | null;
+}
+
+export interface Gameplan extends GameplanListEntry {
+  content: string;
+}
+
 export interface CallAttendee {
   name: string;
   title: string;

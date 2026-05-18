@@ -1,4 +1,4 @@
-import type { Account, Stakeholder, Call, CallUploadResponse, CallReparseResponse, Question, QuestionWithContext, PainEnriched, PainWithSources, Pain } from '@tc/shared';
+import type { Account, Stakeholder, Call, CallUploadResponse, CallReparseResponse, Question, QuestionWithContext, PainEnriched, PainWithSources, Pain, Gameplan, GameplanListEntry } from '@tc/shared';
 
 const BASE = '/api';
 
@@ -186,6 +186,16 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetId }),
       }),
+  },
+  gameplans: {
+    listForAccount: (accountId: string) =>
+      request<GameplanListEntry[]>(`/accounts/${accountId}/gameplans`),
+    generate: (accountId: string) =>
+      request<Gameplan>(`/accounts/${accountId}/gameplans/generate`, { method: 'POST' }),
+    get: (id: string) =>
+      request<Gameplan>(`/gameplans/${id}`),
+    delete: (id: string) =>
+      request<{ success: boolean }>(`/gameplans/${id}`, { method: 'DELETE' }),
   },
   data: { exportData, importData, backupNow },
 };
