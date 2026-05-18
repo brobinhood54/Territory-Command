@@ -178,6 +178,7 @@ export default function AccountDetail({
         {activeTab === 'calls' && (
           <AccountCalls
             accountId={account.id}
+            stakeholders={stakeholders}
             calls={calls}
             loadingCalls={loadingCalls}
             onCallUpdate={(updated) => setCalls(prev => prev.map(c => c.id === updated.id ? updated : c))}

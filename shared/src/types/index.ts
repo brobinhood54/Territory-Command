@@ -175,6 +175,77 @@ export interface Gameplan extends GameplanListEntry {
   content: string;
 }
 
+export type PreCallPlanStatus = 'draft' | 'generated' | 'completed';
+
+export type PreCallPlanMeetingType =
+  | 'discovery'
+  | 'demo'
+  | 'poc_kickoff'
+  | 'poc_update'
+  | 'exec_alignment'
+  | 'negotiation'
+  | 'other';
+
+export interface PreCallPlanAttendeePrep {
+  name: string;
+  stakeholder_id: string | null;
+  role: string;
+  talkingTo: string;
+  watchFor: string;
+}
+
+export interface PreCallPlanTalkingPoint {
+  order: number;
+  topic: string;
+  supportingDetail: string;
+}
+
+export interface PreCallPlanObjection {
+  objection: string;
+  response: string;
+}
+
+export interface PreCallPlanContent {
+  goal: string;
+  presenter: {
+    primary: string;
+    supporting: string[];
+  };
+  talkingPoints: PreCallPlanTalkingPoint[];
+  customerContext: {
+    whatTheyCareAbout: string;
+    perAttendee: PreCallPlanAttendeePrep[];
+  };
+  anticipatedObjections: PreCallPlanObjection[];
+  desiredOutcome: string;
+}
+
+export interface PreCallPlan {
+  id: string;
+  account_id: string;
+  title: string;
+  meeting_type: string;
+  planned_date: string | null;
+  goal: string | null;
+  attendee_stakeholder_ids: string | null;
+  additional_attendees: string | null;
+  content: string | null;
+  status: string;
+  linked_call_id: string | null;
+  generated_at: number | null;
+  model_used: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  latency_ms: number | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface PreCallPlanWithCall extends PreCallPlan {
+  linked_call_title?: string | null;
+  linked_call_date?: string | null;
+}
+
 export interface CallAttendee {
   name: string;
   title: string;

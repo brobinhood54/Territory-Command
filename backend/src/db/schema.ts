@@ -90,6 +90,27 @@ export const gameplans = sqliteTable('gameplans', {
   generated_with_data_signature: text('generated_with_data_signature'),
 });
 
+export const pre_call_plans = sqliteTable('pre_call_plans', {
+  id: text('id').primaryKey(),
+  account_id: text('account_id').references(() => accounts.id).notNull(),
+  title: text('title').notNull(),
+  meeting_type: text('meeting_type').notNull(),
+  planned_date: text('planned_date'),
+  goal: text('goal'),
+  attendee_stakeholder_ids: text('attendee_stakeholder_ids'),
+  additional_attendees: text('additional_attendees'),
+  content: text('content'),
+  status: text('status').notNull().default('draft'),
+  linked_call_id: text('linked_call_id'),
+  generated_at: integer('generated_at'),
+  model_used: text('model_used'),
+  input_tokens: integer('input_tokens'),
+  output_tokens: integer('output_tokens'),
+  latency_ms: integer('latency_ms'),
+  created_at: integer('created_at').notNull(),
+  updated_at: integer('updated_at').notNull(),
+});
+
 export const calls = sqliteTable('calls', {
   id: text('id').primaryKey(),
   account_id: text('account_id').references(() => accounts.id).notNull(),

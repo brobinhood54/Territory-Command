@@ -104,6 +104,29 @@ export async function runMigrations(): Promise<void> {
   `);
 
   await libsqlClient.execute(`
+    CREATE TABLE IF NOT EXISTS pre_call_plans (
+      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES accounts(id),
+      title TEXT NOT NULL,
+      meeting_type TEXT NOT NULL,
+      planned_date TEXT,
+      goal TEXT,
+      attendee_stakeholder_ids TEXT,
+      additional_attendees TEXT,
+      content TEXT,
+      status TEXT NOT NULL DEFAULT 'draft',
+      linked_call_id TEXT,
+      generated_at INTEGER,
+      model_used TEXT,
+      input_tokens INTEGER,
+      output_tokens INTEGER,
+      latency_ms INTEGER,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `);
+
+  await libsqlClient.execute(`
     CREATE TABLE IF NOT EXISTS questions (
       id TEXT PRIMARY KEY,
       account_id TEXT NOT NULL REFERENCES accounts(id),
