@@ -1,30 +1,61 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Account, Call, Stakeholder } from '@tc/shared';
+import type { Account, Call, Stakeholder, Question } from '@tc/shared';
 import { api } from '../lib/api';
 import { showToast } from '../lib/toast';
 import TabBar from './TabBar';
 import AccountOverview from './AccountOverview';
 import AccountStakeholders from './AccountStakeholders';
 import AccountCalls from './AccountCalls';
+import AccountQuestions from './AccountQuestions';
 
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'stakeholders', label: 'Stakeholders' },
   { key: 'calls', label: 'Calls' },
+  { key: 'questions', label: 'Questions' },
 ];
 
 interface AccountDetailProps {
   account: Account | null;
   onUpdate: (updated: Account) => void;
+  activeTab?: string;
+  onActiveTabChange?: (tab: string) => void;
+  highlightCallIdExternal?: string | null;
+  onHighlightCallIdExternalConsumed?: () => void;
+  onQuestionStatusChange?: () => void;
 }
 
-export default function AccountDetail({ account, onUpdate }: AccountDetailProps) {
-  const [activeTab, setActiveTab] = useState('overview');
+export default function AccountDetail({
+  account,
+  onUpdate,
+  activeTab: externalActiveTab,
+  onActiveTabChange,
+  highlightCallIdExternal,
+  onHighlightCallIdExternalConsumed,
+  onQuestionStatusChange,
+}: AccountDetailProps) {
+  const [internalActiveTab, setInternalActiveTab] = useState('overview');
+  const activeTab = externalActiveTab ?? internalActiveTab;
+  function setActiveTab(tab: string) {
+    setInternalActiveTab(tab);
+    onActiveTabChange?.(tab);
+  }
+
   const [calls, setCalls] = useState<Call[]>([]);
   const [loadingCalls, setLoadingCalls] = useState(false);
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
   const [loadingStakeholders, setLoadingStakeholders] = useState(false);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [highlightCallId, setHighlightCallId] = useState<string | null>(null);
+
+  // Sync external highlight (from Open Loops navigation)
+  useEffect(() => {
+    if (highlightCallIdExternal) {
+      setHighlightCallId(highlightCallIdExternal);
+      onHighlightCallIdExternalConsumed?.();
+    }
+  }, [highlightCallIdExternal, onHighlightCallIdExternalConsumed]);
 
   const loadCalls = useCallback(async (accountId: string) => {
     setLoadingCalls(true);
@@ -52,21 +83,37 @@ export default function AccountDetail({ account, onUpdate }: AccountDetailProps)
     }
   }, []);
 
+  const loadQuestions = useCallback(async (accountId: string) => {
+    setLoadingQuestions(true);
+    try {
+      const rows = await api.questions.listForAccount(accountId);
+      setQuestions(rows);
+    } catch (err) {
+      console.error('Failed to load questions:', err);
+      showToast('error', 'Failed to load questions');
+    } finally {
+      setLoadingQuestions(false);
+    }
+  }, []);
+
   const accountId = account?.id ?? null;
 
   useEffect(() => {
     if (!accountId) {
       setCalls([]);
       setStakeholders([]);
+      setQuestions([]);
       setHighlightCallId(null);
       return;
     }
     setCalls([]);
     setStakeholders([]);
+    setQuestions([]);
     setHighlightCallId(null);
     void loadCalls(accountId);
     void loadStakeholders(accountId);
-  }, [accountId, loadCalls, loadStakeholders]);
+    void loadQuestions(accountId);
+  }, [accountId, loadCalls, loadStakeholders, loadQuestions]);
 
   if (!account) {
     return (
@@ -113,10 +160,33 @@ export default function AccountDetail({ account, onUpdate }: AccountDetailProps)
             loadingCalls={loadingCalls}
             onCallUpdate={(updated) => setCalls(prev => prev.map(c => c.id === updated.id ? updated : c))}
             onCallDelete={(id) => setCalls(prev => prev.filter(c => c.id !== id))}
-            onCallsRefresh={() => loadCalls(account.id)}
+            onCallsRefresh={async () => {
+              await loadCalls(account.id);
+              void loadQuestions(account.id);
+            }}
             onAttendeesSeeded={() => void loadStakeholders(account.id)}
             highlightCallId={highlightCallId}
             onHighlightConsumed={() => setHighlightCallId(null)}
+          />
+        )}
+        {activeTab === 'questions' && (
+          <AccountQuestions
+            questions={questions}
+            stakeholders={stakeholders}
+            callsMap={Object.fromEntries(calls.map(c => [c.id, { title: c.title, date: c.date }]))}
+            loading={loadingQuestions}
+            onQuestionUpdate={(updated) => {
+              setQuestions(prev => prev.map(q => q.id === updated.id ? updated : q));
+              onQuestionStatusChange?.();
+            }}
+            onQuestionDelete={(id) => {
+              setQuestions(prev => prev.filter(q => q.id !== id));
+              onQuestionStatusChange?.();
+            }}
+            onOpenSourceCall={(callId) => {
+              setActiveTab('calls');
+              setHighlightCallId(callId);
+            }}
           />
         )}
       </div>
