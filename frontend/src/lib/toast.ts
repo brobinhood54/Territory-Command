@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from 'react';
+
 export type ToastType = 'success' | 'warning' | 'error';
 
 export interface Toast {
@@ -6,12 +8,54 @@ export interface Toast {
   message: string;
 }
 
-// Phase 1.4 implements the full toast stack with auto-dismiss and context provider.
-// This stub satisfies all imports and renders nothing until then.
+const DISMISS_DELAY: Record<ToastType, number> = {
+  success: 12000,
+  warning: 12000,
+  error: 20000,
+};
+
+// Module-level singleton so all useToast() calls share the same state
+let toasts: Toast[] = [];
+const listeners: Set<() => void> = new Set();
+const timers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+
+function notify() {
+  listeners.forEach(fn => fn());
+}
+
+function subscribe(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+function getSnapshot(): Toast[] {
+  return toasts;
+}
+
+export function showToast(type: ToastType, message: string): void {
+  const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  toasts = [...toasts, { id, type, message }];
+  notify();
+
+  const timer = setTimeout(() => dismissToast(id), DISMISS_DELAY[type]);
+  timers.set(id, timer);
+}
+
+export function dismissToast(id: string): void {
+  const timer = timers.get(id);
+  if (timer !== undefined) {
+    clearTimeout(timer);
+    timers.delete(id);
+  }
+  toasts = toasts.filter(t => t.id !== id);
+  notify();
+}
+
 export function useToast() {
+  const currentToasts = useSyncExternalStore(subscribe, getSnapshot);
   return {
-    toasts: [] as Toast[],
-    show: (_type: ToastType, _message: string) => {},
-    dismiss: (_id: string) => {},
+    toasts: currentToasts,
+    show: showToast,
+    dismiss: dismissToast,
   };
 }

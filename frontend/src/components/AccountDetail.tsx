@@ -3,10 +3,12 @@ import type { Account } from '@tc/shared';
 import TabBar from './TabBar';
 import AccountOverview from './AccountOverview';
 import AccountStakeholders from './AccountStakeholders';
+import AccountCalls from './AccountCalls';
 
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'stakeholders', label: 'Stakeholders' },
+  { key: 'calls', label: 'Calls' },
 ];
 
 interface AccountDetailProps {
@@ -16,6 +18,7 @@ interface AccountDetailProps {
 
 export default function AccountDetail({ account, onUpdate }: AccountDetailProps) {
   const [activeTab, setActiveTab] = useState('overview');
+  const [stakeholderRefreshKey, setStakeholderRefreshKey] = useState(0);
 
   if (!account) {
     return (
@@ -40,7 +43,17 @@ export default function AccountDetail({ account, onUpdate }: AccountDetailProps)
           <AccountOverview account={account} onUpdate={onUpdate} />
         )}
         {activeTab === 'stakeholders' && (
-          <AccountStakeholders accountId={account.id} accountName={account.name} />
+          <AccountStakeholders
+            key={`stakeholders-${account.id}-${stakeholderRefreshKey}`}
+            accountId={account.id}
+            accountName={account.name}
+          />
+        )}
+        {activeTab === 'calls' && (
+          <AccountCalls
+            accountId={account.id}
+            onAttendeesSeeded={() => setStakeholderRefreshKey(k => k + 1)}
+          />
         )}
       </div>
     </div>
