@@ -1,5 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import type { Account } from '@tc/shared';
+import { api } from '../lib/api';
+import { showToast } from '../lib/toast';
+import { showConfirm } from './ConfirmModal';
 
 interface SidebarProps {
   accounts: Account[];
@@ -53,6 +56,59 @@ export default function Sidebar({
   const [search, setSearch] = useState('');
   const [industryFilter, setIndustryFilter] = useState('All');
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleExport() {
+    try {
+      await api.data.exportData();
+      showToast('success', 'Exported.', { quiet: true });
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Export failed');
+    }
+  }
+
+  async function handleImportFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!fileInputRef.current) return;
+    fileInputRef.current.value = '';
+    if (!file) return;
+
+    const ok = await showConfirm({
+      title: `Replace all local data with "${file.name}"?`,
+      body: 'Your current data will be auto-backed up first. This action cannot be undone.',
+      confirmLabel: 'Import',
+      destructive: true,
+    });
+    if (!ok) return;
+
+    setImporting(true);
+    try {
+      await api.data.exportData();
+    } catch (err) {
+      showToast('error', `Auto-backup failed: ${err instanceof Error ? err.message : 'unknown error'}. Import cancelled.`);
+      setImporting(false);
+      return;
+    }
+
+    try {
+      const result = await api.data.importData(file);
+      showToast('success', `Imported ${result.summary.accounts} accounts, ${result.summary.stakeholders} stakeholders, ${result.summary.calls} calls.`);
+      setTimeout(() => window.location.reload(), 800);
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Import failed');
+      setImporting(false);
+    }
+  }
+
+  async function handleBackup() {
+    try {
+      const result = await api.data.backupNow();
+      showToast('success', `Backed up to ${result.path}`);
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Backup failed');
+    }
+  }
 
   const industries = useMemo(() => {
     const set = new Set<string>();
@@ -131,6 +187,15 @@ export default function Sidebar({
           {collapsed ? '▶' : '◀'}
         </button>
       </div>
+
+      {/* Hidden file input for import -- at module scope equivalent via ref, outside the list */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        style={{ display: 'none' }}
+        onChange={handleImportFileSelected}
+      />
 
       {/* Content: only shown when expanded */}
       {!collapsed && (
@@ -273,6 +338,73 @@ export default function Sidebar({
                 );
               })
             )}
+          </div>
+          {/* Data actions footer */}
+          <div style={{
+            borderTop: '1px solid #1e3048',
+            padding: '0.5rem 0.625rem',
+            display: 'flex',
+            gap: '0.375rem',
+            flexShrink: 0,
+          }}>
+            <button
+              onClick={handleExport}
+              title="Export all data as JSON"
+              style={{
+                flex: 1,
+                background: '#162032',
+                border: '1px solid #1e3048',
+                borderRadius: '0.25rem',
+                color: '#6b8599',
+                fontSize: '0.675rem',
+                fontWeight: 500,
+                padding: '0.3rem 0.25rem',
+                cursor: 'pointer',
+                letterSpacing: '0.04em',
+                fontFamily: 'inherit',
+              }}
+            >
+              Export
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              title="Import data from a JSON backup"
+              style={{
+                flex: 1,
+                background: '#162032',
+                border: '1px solid #1e3048',
+                borderRadius: '0.25rem',
+                color: importing ? '#3a5068' : '#6b8599',
+                fontSize: '0.675rem',
+                fontWeight: 500,
+                padding: '0.3rem 0.25rem',
+                cursor: importing ? 'not-allowed' : 'pointer',
+                letterSpacing: '0.04em',
+                fontFamily: 'inherit',
+              }}
+            >
+              {importing ? 'Importing...' : 'Import'}
+            </button>
+            <button
+              onClick={handleBackup}
+              title="Save a SQLite snapshot to backend/data/backups/"
+              style={{
+                flex: 1,
+                background: '#162032',
+                border: '1px solid #1e3048',
+                borderRadius: '0.25rem',
+                color: '#6b8599',
+                fontSize: '0.675rem',
+                fontWeight: 500,
+                padding: '0.3rem 0.25rem',
+                cursor: 'pointer',
+                letterSpacing: '0.04em',
+                fontFamily: 'inherit',
+              }}
+            >
+              Backup
+            </button>
           </div>
         </>
       )}

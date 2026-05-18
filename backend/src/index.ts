@@ -9,6 +9,7 @@ import { healthRoutes } from './routes/health';
 import { accountRoutes } from './routes/accounts';
 import { stakeholderRoutes } from './routes/stakeholders';
 import { callRoutes } from './routes/calls';
+import { backupRoutes } from './routes/backup';
 
 async function main() {
   await runMigrations();
@@ -19,6 +20,7 @@ async function main() {
   app.route('/api', accountRoutes);
   app.route('/api', stakeholderRoutes);
   app.route('/api', callRoutes);
+  app.route('/api', backupRoutes);
 
   const port = 3001;
   serve({ fetch: app.fetch, port }, () => {

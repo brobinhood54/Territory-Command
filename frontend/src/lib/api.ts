@@ -38,6 +38,50 @@ export type CallPatch = {
   health?: string;
 };
 
+export type ImportResult = {
+  ok: true;
+  summary: { accounts: number; stakeholders: number; calls: number };
+};
+
+export type BackupResult = {
+  ok: true;
+  path: string;
+  size_bytes: number;
+};
+
+async function exportData(): Promise<void> {
+  const res = await fetch(`${BASE}/export`);
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  const disposition = res.headers.get('Content-Disposition') ?? '';
+  const match = disposition.match(/filename="([^"]+)"/);
+  const filename = match ? match[1] : 'territory-command-backup.json';
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function importData(file: File): Promise<ImportResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${BASE}/import`, { method: 'POST', body: formData });
+  const json = await res.json();
+  if (!res.ok) throw new Error((json as { error?: string }).error ?? `${res.status} ${res.statusText}`);
+  return json as ImportResult;
+}
+
+async function backupNow(): Promise<BackupResult> {
+  const res = await fetch(`${BASE}/backup`, { method: 'POST' });
+  const json = await res.json();
+  if (!res.ok) throw new Error((json as { error?: string }).error ?? `${res.status} ${res.statusText}`);
+  return json as BackupResult;
+}
+
 export const api = {
   accounts: {
     list: () => request<Account[]>('/accounts'),
@@ -97,4 +141,5 @@ export const api = {
     reparse: (id: string) =>
       request<CallReparseResponse>(`/calls/${id}/reparse`, { method: 'POST' }),
   },
+  data: { exportData, importData, backupNow },
 };
