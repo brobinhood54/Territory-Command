@@ -9,6 +9,7 @@ export default function App() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -24,6 +25,10 @@ export default function App() {
       });
   }, []);
 
+  function handleAccountUpdate(updated: Account) {
+    setAccounts(prev => prev.map(a => a.id === updated.id ? { ...a, ...updated } : a));
+  }
+
   const selectedAccount = accounts.find(a => a.id === selectedId) ?? null;
 
   return (
@@ -37,10 +42,15 @@ export default function App() {
         accounts={accounts}
         loading={loading}
         selectedId={selectedId}
+        collapsed={sidebarCollapsed}
         onSelect={setSelectedId}
+        onToggleCollapse={() => setSidebarCollapsed(c => !c)}
       />
-      <main style={{ flex: 1, overflow: 'auto' }}>
-        <AccountDetail account={selectedAccount} />
+      <main style={{ flex: 1, overflow: 'auto', minWidth: 0 }}>
+        <AccountDetail
+          account={selectedAccount}
+          onUpdate={handleAccountUpdate}
+        />
       </main>
       <Toast toasts={toast.toasts} onDismiss={toast.dismiss} />
     </div>
