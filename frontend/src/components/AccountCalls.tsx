@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import type { Call, CallAttendee } from '@tc/shared';
 import { api } from '../lib/api';
@@ -294,13 +294,16 @@ function ParseProgressPanel({ items, elapsed }: ParseProgressPanelProps) {
 
 interface CallCardProps {
   call: Call;
+  highlighted?: boolean;
+  onHighlightConsumed?: () => void;
   onUpdate: (updated: Call) => void;
   onDelete: (id: string) => void;
   onReparse: (id: string) => Promise<void>;
 }
 
-function CallCard({ call, onUpdate, onDelete, onReparse }: CallCardProps) {
+function CallCard({ call, highlighted, onHighlightConsumed, onUpdate, onDelete, onReparse }: CallCardProps) {
   const confirm = useConfirm();
+  const cardRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingDate, setEditingDate] = useState(false);
@@ -319,6 +322,18 @@ function CallCard({ call, onUpdate, onDelete, onReparse }: CallCardProps) {
     setDateVal(call.date ?? '');
     setSummaryVal(call.summary ?? '');
   }
+
+  // Expand and scroll into view when highlighted
+  useEffect(() => {
+    if (!highlighted) return;
+    setExpanded(true);
+    setTimeout(() => {
+      cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 80);
+    onHighlightConsumed?.();
+  // onHighlightConsumed is stable (set once from AccountDetail state setter)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlighted]);
 
   const attendees = parseAttendees(call.customer_attendees);
   const health = call.health ?? 'unknown';
@@ -411,7 +426,7 @@ function CallCard({ call, onUpdate, onDelete, onReparse }: CallCardProps) {
   const summaryPreview = (call.summary ?? '').split('\n').find(l => l.trim()) ?? '';
 
   return (
-    <div style={cardBase}>
+    <div ref={cardRef} style={cardBase}>
       {/* Header */}
       <div style={{ padding: '0.875rem 1rem 0.625rem' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.625rem', flexWrap: 'wrap' }}>
@@ -688,30 +703,30 @@ function CallCard({ call, onUpdate, onDelete, onReparse }: CallCardProps) {
 
 interface AccountCallsProps {
   accountId: string;
+  calls: Call[];
+  loadingCalls: boolean;
+  onCallUpdate: (updated: Call) => void;
+  onCallDelete: (id: string) => void;
+  onCallsRefresh: () => Promise<void>;
   onAttendeesSeeded: () => void;
+  highlightCallId?: string | null;
+  onHighlightConsumed?: () => void;
 }
 
-export default function AccountCalls({ accountId, onAttendeesSeeded }: AccountCallsProps) {
-  const [calls, setCalls] = useState<Call[]>([]);
-  const [loadingCalls, setLoadingCalls] = useState(true);
+export default function AccountCalls({
+  accountId,
+  calls,
+  loadingCalls,
+  onCallUpdate,
+  onCallDelete,
+  onCallsRefresh,
+  onAttendeesSeeded,
+  highlightCallId,
+  onHighlightConsumed,
+}: AccountCallsProps) {
   const [parseItems, setParseItems] = useState<ParseItem[] | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const loadCalls = useCallback(async () => {
-    try {
-      const rows = await api.calls.list(accountId);
-      setCalls(rows);
-    } catch (err) {
-      console.error('Failed to load calls:', err);
-      showToast('error', 'Failed to load calls');
-    }
-  }, [accountId]);
-
-  useEffect(() => {
-    setLoadingCalls(true);
-    loadCalls().finally(() => setLoadingCalls(false));
-  }, [loadCalls]);
 
   function startElapsedTimer() {
     setElapsed(0);
@@ -778,17 +793,13 @@ export default function AccountCalls({ accountId, onAttendeesSeeded }: AccountCa
     }
 
     if (totalSeeded > 0) onAttendeesSeeded();
-    if (succeeded > 0) await loadCalls();
-  }
-
-  function handleCallUpdate(updated: Call) {
-    setCalls(prev => prev.map(c => c.id === updated.id ? updated : c));
+    if (succeeded > 0) await onCallsRefresh();
   }
 
   async function handleCallDelete(id: string) {
     try {
       await api.calls.delete(id);
-      setCalls(prev => prev.filter(c => c.id !== id));
+      onCallDelete(id);
       showToast('success', 'Call deleted. Stakeholders seeded from it remain on the account.');
     } catch (err) {
       console.error('Failed to delete call:', err);
@@ -799,7 +810,7 @@ export default function AccountCalls({ accountId, onAttendeesSeeded }: AccountCa
   async function handleCallReparse(id: string) {
     try {
       const result = await api.calls.reparse(id);
-      setCalls(prev => prev.map(c => c.id === id ? result.call : c));
+      onCallUpdate(result.call);
       const msg = result.attendeesSeeded > 0
         ? `Re-parsed. Seeded ${result.attendeesSeeded} new ${result.attendeesSeeded === 1 ? 'stakeholder' : 'stakeholders'}.`
         : 'Re-parsed successfully.';
@@ -880,7 +891,9 @@ export default function AccountCalls({ accountId, onAttendeesSeeded }: AccountCa
         <CallCard
           key={call.id}
           call={call}
-          onUpdate={handleCallUpdate}
+          highlighted={call.id === highlightCallId}
+          onHighlightConsumed={onHighlightConsumed}
+          onUpdate={onCallUpdate}
           onDelete={handleCallDelete}
           onReparse={handleCallReparse}
         />

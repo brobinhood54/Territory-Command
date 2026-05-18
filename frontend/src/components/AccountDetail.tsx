@@ -1,5 +1,7 @@
-import { useState } from 'react';
-import type { Account } from '@tc/shared';
+import { useState, useEffect, useCallback } from 'react';
+import type { Account, Call, Stakeholder } from '@tc/shared';
+import { api } from '../lib/api';
+import { showToast } from '../lib/toast';
 import TabBar from './TabBar';
 import AccountOverview from './AccountOverview';
 import AccountStakeholders from './AccountStakeholders';
@@ -18,7 +20,53 @@ interface AccountDetailProps {
 
 export default function AccountDetail({ account, onUpdate }: AccountDetailProps) {
   const [activeTab, setActiveTab] = useState('overview');
-  const [stakeholderRefreshKey, setStakeholderRefreshKey] = useState(0);
+  const [calls, setCalls] = useState<Call[]>([]);
+  const [loadingCalls, setLoadingCalls] = useState(false);
+  const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
+  const [loadingStakeholders, setLoadingStakeholders] = useState(false);
+  const [highlightCallId, setHighlightCallId] = useState<string | null>(null);
+
+  const loadCalls = useCallback(async (accountId: string) => {
+    setLoadingCalls(true);
+    try {
+      const rows = await api.calls.list(accountId);
+      setCalls(rows);
+    } catch (err) {
+      console.error('Failed to load calls:', err);
+      showToast('error', 'Failed to load calls');
+    } finally {
+      setLoadingCalls(false);
+    }
+  }, []);
+
+  const loadStakeholders = useCallback(async (accountId: string) => {
+    setLoadingStakeholders(true);
+    try {
+      const rows = await api.stakeholders.list(accountId);
+      setStakeholders(rows);
+    } catch (err) {
+      console.error('Failed to load stakeholders:', err);
+      showToast('error', 'Failed to load stakeholders');
+    } finally {
+      setLoadingStakeholders(false);
+    }
+  }, []);
+
+  const accountId = account?.id ?? null;
+
+  useEffect(() => {
+    if (!accountId) {
+      setCalls([]);
+      setStakeholders([]);
+      setHighlightCallId(null);
+      return;
+    }
+    setCalls([]);
+    setStakeholders([]);
+    setHighlightCallId(null);
+    void loadCalls(accountId);
+    void loadStakeholders(accountId);
+  }, [accountId, loadCalls, loadStakeholders]);
 
   if (!account) {
     return (
@@ -40,19 +88,35 @@ export default function AccountDetail({ account, onUpdate }: AccountDetailProps)
       <TabBar tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {activeTab === 'overview' && (
-          <AccountOverview account={account} onUpdate={onUpdate} />
+          <AccountOverview
+            account={account}
+            calls={calls}
+            stakeholders={stakeholders}
+            onUpdate={onUpdate}
+            onSwitchToTab={(tab) => setActiveTab(tab)}
+            onHighlightCall={(callId) => setHighlightCallId(callId)}
+          />
         )}
         {activeTab === 'stakeholders' && (
           <AccountStakeholders
-            key={`stakeholders-${account.id}-${stakeholderRefreshKey}`}
             accountId={account.id}
             accountName={account.name}
+            stakeholders={stakeholders}
+            loadingStakeholders={loadingStakeholders}
+            onStakeholdersChange={setStakeholders}
           />
         )}
         {activeTab === 'calls' && (
           <AccountCalls
             accountId={account.id}
-            onAttendeesSeeded={() => setStakeholderRefreshKey(k => k + 1)}
+            calls={calls}
+            loadingCalls={loadingCalls}
+            onCallUpdate={(updated) => setCalls(prev => prev.map(c => c.id === updated.id ? updated : c))}
+            onCallDelete={(id) => setCalls(prev => prev.filter(c => c.id !== id))}
+            onCallsRefresh={() => loadCalls(account.id)}
+            onAttendeesSeeded={() => void loadStakeholders(account.id)}
+            highlightCallId={highlightCallId}
+            onHighlightConsumed={() => setHighlightCallId(null)}
           />
         )}
       </div>
