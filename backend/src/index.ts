@@ -7,6 +7,7 @@ import { cors } from 'hono/cors';
 import { runMigrations } from './db/migrate';
 import { healthRoutes } from './routes/health';
 import { accountRoutes } from './routes/accounts';
+import { stakeholderRoutes } from './routes/stakeholders';
 
 async function main() {
   await runMigrations();
@@ -15,6 +16,7 @@ async function main() {
   app.use('*', cors({ origin: 'http://localhost:5173' }));
   app.route('/api', healthRoutes);
   app.route('/api', accountRoutes);
+  app.route('/api', stakeholderRoutes);
 
   const port = 3001;
   serve({ fetch: app.fetch, port }, () => {
