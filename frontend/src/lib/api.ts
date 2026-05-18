@@ -1,4 +1,4 @@
-import type { Account, Stakeholder, Call, CallUploadResponse, CallReparseResponse, Question, QuestionWithContext } from '@tc/shared';
+import type { Account, Stakeholder, Call, CallUploadResponse, CallReparseResponse, Question, QuestionWithContext, PainEnriched, PainWithSources, Pain } from '@tc/shared';
 
 const BASE = '/api';
 
@@ -166,6 +166,26 @@ export const api = {
       }),
     delete: (id: string) =>
       request<{ success: boolean }>(`/questions/${id}`, { method: 'DELETE' }),
+  },
+  pains: {
+    listForAccount: (accountId: string) =>
+      request<PainEnriched[]>(`/accounts/${accountId}/pains`),
+    get: (id: string) =>
+      request<PainWithSources>(`/pains/${id}`),
+    update: (id: string, patch: { summary?: string; category?: string; confidence?: string }) =>
+      request<Pain>(`/pains/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      }),
+    delete: (id: string) =>
+      request<{ success: boolean }>(`/pains/${id}`, { method: 'DELETE' }),
+    merge: (sourceId: string, targetId: string) =>
+      request<Pain>(`/pains/${sourceId}/merge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetId }),
+      }),
   },
   data: { exportData, importData, backupNow },
 };

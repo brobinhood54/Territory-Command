@@ -75,6 +75,48 @@ export interface QuestionWithContext extends Question {
   call_title: string | null;
 }
 
+export type PainCategory = 'nhi' | 'agentic' | 'compliance' | 'operational' | 'strategic';
+export type PainConfidence = 'high' | 'medium' | 'low';
+
+export interface Pain {
+  id: string;
+  account_id: string;
+  summary: string;
+  category: PainCategory;
+  confidence: PainConfidence;
+  first_heard_at: string | null;
+  last_heard_at: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface PainSource {
+  id: string;
+  pain_id: string;
+  call_id: string;
+  voicer_name: string;
+  voicer_stakeholder_id: string | null;
+  quote: string;
+  confidence: PainConfidence;
+  created_at: number;
+  call_title?: string | null;
+  call_date?: string | null;
+}
+
+export interface PainVoicer {
+  voicer_name: string;
+  voicer_stakeholder_id: string | null;
+}
+
+export interface PainWithSources extends Pain {
+  sources: PainSource[];
+}
+
+export interface PainEnriched extends Pain {
+  mention_count: number;
+  voicers: PainVoicer[];
+}
+
 export interface CallAttendee {
   name: string;
   title: string;

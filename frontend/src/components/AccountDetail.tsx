@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Account, Call, Stakeholder, Question } from '@tc/shared';
+import type { Account, Call, Stakeholder, Question, PainEnriched } from '@tc/shared';
 import { api } from '../lib/api';
 import { showToast } from '../lib/toast';
 import TabBar from './TabBar';
@@ -7,12 +7,14 @@ import AccountOverview from './AccountOverview';
 import AccountStakeholders from './AccountStakeholders';
 import AccountCalls from './AccountCalls';
 import AccountQuestions from './AccountQuestions';
+import AccountPainFit from './AccountPainFit';
 
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'stakeholders', label: 'Stakeholders' },
   { key: 'calls', label: 'Calls' },
   { key: 'questions', label: 'Questions' },
+  { key: 'painfit', label: 'Pain & Fit' },
 ];
 
 interface AccountDetailProps {
@@ -47,6 +49,8 @@ export default function AccountDetail({
   const [loadingStakeholders, setLoadingStakeholders] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [pains, setPains] = useState<PainEnriched[]>([]);
+  const [loadingPains, setLoadingPains] = useState(false);
   const [highlightCallId, setHighlightCallId] = useState<string | null>(null);
 
   // Sync external highlight (from Open Loops navigation)
@@ -96,6 +100,19 @@ export default function AccountDetail({
     }
   }, []);
 
+  const loadPains = useCallback(async (accountId: string) => {
+    setLoadingPains(true);
+    try {
+      const rows = await api.pains.listForAccount(accountId);
+      setPains(rows);
+    } catch (err) {
+      console.error('Failed to load pains:', err);
+      showToast('error', 'Failed to load pain points');
+    } finally {
+      setLoadingPains(false);
+    }
+  }, []);
+
   const accountId = account?.id ?? null;
 
   useEffect(() => {
@@ -103,17 +120,20 @@ export default function AccountDetail({
       setCalls([]);
       setStakeholders([]);
       setQuestions([]);
+      setPains([]);
       setHighlightCallId(null);
       return;
     }
     setCalls([]);
     setStakeholders([]);
     setQuestions([]);
+    setPains([]);
     setHighlightCallId(null);
     void loadCalls(accountId);
     void loadStakeholders(accountId);
     void loadQuestions(accountId);
-  }, [accountId, loadCalls, loadStakeholders, loadQuestions]);
+    void loadPains(accountId);
+  }, [accountId, loadCalls, loadStakeholders, loadQuestions, loadPains]);
 
   if (!account) {
     return (
@@ -187,6 +207,21 @@ export default function AccountDetail({
               setActiveTab('calls');
               setHighlightCallId(callId);
             }}
+          />
+        )}
+        {activeTab === 'painfit' && (
+          <AccountPainFit
+            pains={pains}
+            stakeholders={stakeholders}
+            loading={loadingPains}
+            onPainUpdate={(updated) => setPains(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p))}
+            onPainDelete={(id) => setPains(prev => prev.filter(p => p.id !== id))}
+            onPainsReload={() => void loadPains(account.id)}
+            onOpenSourceCall={(callId) => {
+              setActiveTab('calls');
+              setHighlightCallId(callId);
+            }}
+            onSwitchToStakeholders={() => setActiveTab('stakeholders')}
           />
         )}
       </div>
