@@ -1,0 +1,56 @@
+import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+
+export const accounts = sqliteTable('accounts', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  industry: text('industry'),
+  state: text('state'),
+  status: text('status').default('Prospect'),
+  fortune_500: integer('fortune_500', { mode: 'boolean' }),
+  fortune_1000: integer('fortune_1000', { mode: 'boolean' }),
+  open_opps: integer('open_opps').default(0),
+  last_activity: text('last_activity'),
+  prior_context: text('prior_context'),
+  sf_id: text('sf_id'),
+  website: text('website'),
+  linkedin_url: text('linkedin_url'),
+  amount: real('amount'),
+  archived: integer('archived', { mode: 'boolean' }).default(false),
+  created_at: integer('created_at'),
+  updated_at: integer('updated_at'),
+});
+
+export const stakeholders = sqliteTable('stakeholders', {
+  id: text('id').primaryKey(),
+  account_id: text('account_id').references(() => accounts.id).notNull(),
+  name: text('name').notNull(),
+  title: text('title'),
+  type: text('type').default('Unclassified'),
+  champion_confirmed: integer('champion_confirmed', { mode: 'boolean' }).default(false),
+  linkedin_url: text('linkedin_url'),
+  email: text('email'),
+  priorities: text('priorities'),
+  messaging: text('messaging'),
+  notes: text('notes'),
+  temperature: text('temperature'),
+  last_touched: text('last_touched'),
+  source: text('source').default('manual'),
+  created_at: integer('created_at'),
+  updated_at: integer('updated_at'),
+});
+
+export const calls = sqliteTable('calls', {
+  id: text('id').primaryKey(),
+  account_id: text('account_id').references(() => accounts.id).notNull(),
+  title: text('title'),
+  date: text('date'),
+  summary: text('summary'),
+  health: text('health').default('unknown'),
+  health_reason: text('health_reason'),
+  customer_attendees: text('customer_attendees'),
+  raw_transcript: text('raw_transcript'),
+  source_file: text('source_file'),
+  source_kind: text('source_kind').default('transcript'),
+  created_at: integer('created_at'),
+  updated_at: integer('updated_at'),
+});

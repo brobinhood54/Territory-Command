@@ -1,0 +1,54 @@
+export interface Account {
+  id: string;
+  name: string;
+  industry: string | null;
+  state: string | null;
+  status: string | null;
+  fortune_500: boolean | null;
+  fortune_1000: boolean | null;
+  open_opps: number | null;
+  last_activity: string | null;
+  prior_context: string | null;
+  sf_id: string | null;
+  website: string | null;
+  linkedin_url: string | null;
+  amount: number | null;
+  archived: boolean | null;
+  created_at: number | null;
+  updated_at: number | null;
+}
+
+export interface Stakeholder {
+  id: string;
+  account_id: string;
+  name: string;
+  title: string | null;
+  type: string | null;
+  champion_confirmed: boolean | null;
+  linkedin_url: string | null;
+  email: string | null;
+  priorities: string | null;
+  messaging: string | null;
+  notes: string | null;
+  temperature: string | null;
+  last_touched: string | null;
+  source: string | null;
+  created_at: number | null;
+  updated_at: number | null;
+}
+
+export interface Call {
+  id: string;
+  account_id: string;
+  title: string | null;
+  date: string | null;
+  summary: string | null;
+  health: string | null;
+  health_reason: string | null;
+  customer_attendees: string | null;
+  raw_transcript: string | null;
+  source_file: string | null;
+  source_kind: string | null;
+  created_at: number | null;
+  updated_at: number | null;
+}
