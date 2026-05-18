@@ -1,4 +1,4 @@
-import type { Account, Stakeholder, Call, CallUploadResponse, CallReparseResponse, Question, QuestionWithContext, PainEnriched, PainWithSources, Pain, Gameplan, GameplanListEntry } from '@tc/shared';
+import type { Account, Stakeholder, Call, CallUploadResponse, CallReparseResponse, Question, QuestionWithContext, PainEnriched, PainWithSources, Pain, Gameplan, GameplanListEntry, PreCallPlan } from '@tc/shared';
 
 const BASE = '/api';
 
@@ -196,6 +196,49 @@ export const api = {
       request<Gameplan>(`/gameplans/${id}`),
     delete: (id: string) =>
       request<{ success: boolean }>(`/gameplans/${id}`, { method: 'DELETE' }),
+  },
+  preCallPlans: {
+    listForAccount: (accountId: string) =>
+      request<PreCallPlan[]>(`/accounts/${accountId}/pre-call-plans`),
+    create: (accountId: string, body: {
+      title: string;
+      meeting_type: string;
+      planned_date?: string | null;
+      goal?: string | null;
+      attendee_stakeholder_ids?: string[];
+      additional_attendees?: string | null;
+    }) =>
+      request<PreCallPlan>(`/accounts/${accountId}/pre-call-plans`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+    get: (id: string) => request<PreCallPlan>(`/pre-call-plans/${id}`),
+    generate: (id: string) =>
+      request<PreCallPlan>(`/pre-call-plans/${id}/generate`, { method: 'POST' }),
+    update: (id: string, patch: {
+      title?: string;
+      meeting_type?: string;
+      planned_date?: string | null;
+      goal?: string | null;
+      attendee_stakeholder_ids?: string[];
+      additional_attendees?: string | null;
+    }) =>
+      request<PreCallPlan>(`/pre-call-plans/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      }),
+    delete: (id: string) =>
+      request<{ success: boolean }>(`/pre-call-plans/${id}`, { method: 'DELETE' }),
+    linkCall: (id: string, callId: string) =>
+      request<PreCallPlan>(`/pre-call-plans/${id}/link-call`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ callId }),
+      }),
+    unlinkCall: (id: string) =>
+      request<PreCallPlan>(`/pre-call-plans/${id}/unlink-call`, { method: 'POST' }),
   },
   data: { exportData, importData, backupNow },
 };

@@ -7,6 +7,7 @@ import { callClaude } from '../ai/client';
 import { CALL_PARSE_SYSTEM, extractMetadata } from '../ai/prompts/parseCall';
 import { fuzzyMatchName, fuzzyMatchText } from '../lib/fuzzyMatch';
 import type { ParsedQuestion, ParsedPain } from '../ai/prompts/parseCall';
+import { autoLinkPreCallPlans } from './preCallPlans';
 
 export const callRoutes = new Hono();
 
@@ -517,8 +518,22 @@ callRoutes.post('/accounts/:accountId/calls/upload', async (c) => {
         existingStakeholders
       );
 
+      // Auto-link any matching pre-call plans on this account
+      const callAttendeeObjs = metadata.customer_attendees ?? [];
+      const callStakeholderIds = existingStakeholders
+        .filter(s => fuzzyMatchName(s.name, callAttendeeObjs.map(a => a.name)) !== null)
+        .map(s => s.id);
+
+      const autoLinkedPlans = await autoLinkPreCallPlans(
+        accountId,
+        id,
+        metadata.date ?? null,
+        callAttendeeObjs,
+        callStakeholderIds
+      );
+
       const created = (await db.select().from(calls).where(eq(calls.id, id)))[0];
-      results.push({ ok: true, filename, call: created, attendeesSeeded: seeded, attendeesMerged: merged, questionsSeeded, painsSeeded });
+      results.push({ ok: true, filename, call: created, attendeesSeeded: seeded, attendeesMerged: merged, questionsSeeded, painsSeeded, autoLinkedPlans });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[calls/upload] failed for "${filename}":`, message);
