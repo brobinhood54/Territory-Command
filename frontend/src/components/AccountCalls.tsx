@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import type { Call, CallAttendee } from '@tc/shared';
 import { api } from '../lib/api';
 import { showToast } from '../lib/toast';
+import { useConfirm } from './ConfirmModal';
 
 // ---- types ----
 
@@ -299,12 +300,11 @@ interface CallCardProps {
 }
 
 function CallCard({ call, onUpdate, onDelete, onReparse }: CallCardProps) {
+  const confirm = useConfirm();
   const [expanded, setExpanded] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingDate, setEditingDate] = useState(false);
   const [editingSummary, setEditingSummary] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [confirmReparse, setConfirmReparse] = useState(false);
   const [reparsing, setReparsing] = useState(false);
 
   const [titleVal, setTitleVal] = useState(call.title ?? '');
@@ -331,9 +331,11 @@ function CallCard({ call, onUpdate, onDelete, onReparse }: CallCardProps) {
     try {
       const updated = await api.calls.update(call.id, { title: trimmed || (call.title ?? '') });
       onUpdate(updated);
+      showToast('success', 'Saved', { quiet: true });
     } catch (err) {
       console.error('Failed to save title:', err);
       setTitleVal(call.title ?? '');
+      showToast('error', err instanceof Error ? err.message : 'Failed to save title');
     }
   }
 
@@ -344,9 +346,11 @@ function CallCard({ call, onUpdate, onDelete, onReparse }: CallCardProps) {
     try {
       const updated = await api.calls.update(call.id, { date: trimmed || null });
       onUpdate(updated);
+      showToast('success', 'Saved', { quiet: true });
     } catch (err) {
       console.error('Failed to save date:', err);
       setDateVal(call.date ?? '');
+      showToast('error', err instanceof Error ? err.message : 'Failed to save date');
     }
   }
 
@@ -358,9 +362,11 @@ function CallCard({ call, onUpdate, onDelete, onReparse }: CallCardProps) {
       const updated = await api.calls.update(call.id, { summary: trimmed });
       onUpdate(updated);
       setSummaryVal(updated.summary ?? '');
+      showToast('success', 'Saved', { quiet: true });
     } catch (err) {
       console.error('Failed to save summary:', err);
       setSummaryVal(call.summary ?? '');
+      showToast('error', err instanceof Error ? err.message : 'Failed to save summary');
     }
   }
 
@@ -369,19 +375,36 @@ function CallCard({ call, onUpdate, onDelete, onReparse }: CallCardProps) {
     try {
       const updated = await api.calls.update(call.id, { health: next });
       onUpdate(updated);
+      showToast('success', 'Saved', { quiet: true });
     } catch (err) {
       console.error('Failed to update health:', err);
+      showToast('error', err instanceof Error ? err.message : 'Failed to update health');
     }
   }
 
-  async function handleReparse() {
-    setConfirmReparse(false);
+  async function handleReparseClick() {
+    const ok = await confirm({
+      title: 'Re-parse this call with AI?',
+      body: 'The current summary will be replaced.',
+      confirmLabel: 'Re-parse',
+    });
+    if (!ok) return;
     setReparsing(true);
     try {
       await onReparse(call.id);
     } finally {
       setReparsing(false);
     }
+  }
+
+  async function handleDeleteClick() {
+    const ok = await confirm({
+      title: 'Delete this call?',
+      body: 'Stakeholders seeded from it remain on the account.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (ok) onDelete(call.id);
   }
 
   // First line of summary for collapsed preview
@@ -623,109 +646,38 @@ function CallCard({ call, onUpdate, onDelete, onReparse }: CallCardProps) {
           )}
 
           {/* Re-parse */}
-          {confirmReparse ? (
-            <span style={{ display: 'flex', gap: '0.375rem', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.6875rem', color: '#9db8cc' }}>Re-parse?</span>
-              <button
-                onClick={handleReparse}
-                disabled={reparsing}
-                style={{
-                  background: '#00e5a0',
-                  color: '#080e1a',
-                  border: 'none',
-                  borderRadius: '0.25rem',
-                  padding: '0.2rem 0.5rem',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  cursor: reparsing ? 'default' : 'pointer',
-                }}
-              >
-                {reparsing ? 'Parsing...' : 'Confirm'}
-              </button>
-              <button
-                onClick={() => setConfirmReparse(false)}
-                style={{
-                  background: 'none',
-                  border: '1px solid #1e3048',
-                  borderRadius: '0.25rem',
-                  color: '#6b8599',
-                  padding: '0.2rem 0.5rem',
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-            </span>
-          ) : (
-            <button
-              onClick={() => setConfirmReparse(true)}
-              disabled={reparsing}
-              style={{
-                background: 'none',
-                border: '1px solid #1e3048',
-                borderRadius: '0.25rem',
-                color: '#6b8599',
-                fontSize: '0.75rem',
-                padding: '0.2rem 0.5rem',
-                cursor: 'pointer',
-              }}
-            >
-              Re-parse with AI
-            </button>
-          )}
+          <button
+            onClick={handleReparseClick}
+            disabled={reparsing}
+            style={{
+              background: 'none',
+              border: '1px solid #1e3048',
+              borderRadius: '0.25rem',
+              color: '#6b8599',
+              fontSize: '0.75rem',
+              padding: '0.2rem 0.5rem',
+              cursor: reparsing ? 'default' : 'pointer',
+            }}
+          >
+            {reparsing ? 'Parsing...' : 'Re-parse with AI'}
+          </button>
 
           {/* Delete */}
-          {confirmDelete ? (
-            <span style={{ display: 'flex', gap: '0.375rem', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.6875rem', color: '#e06050' }}>Delete?</span>
-              <button
-                onClick={() => { onDelete(call.id); setConfirmDelete(false); }}
-                style={{
-                  background: '#e06050',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '0.25rem',
-                  padding: '0.2rem 0.5rem',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Delete
-              </button>
-              <button
-                onClick={() => setConfirmDelete(false)}
-                style={{
-                  background: 'none',
-                  border: '1px solid #1e3048',
-                  borderRadius: '0.25rem',
-                  color: '#6b8599',
-                  padding: '0.2rem 0.5rem',
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-            </span>
-          ) : (
-            <button
-              onClick={() => setConfirmDelete(true)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#4a6070',
-                fontSize: '0.875rem',
-                cursor: 'pointer',
-                padding: '0 0.125rem',
-                lineHeight: 1,
-              }}
-              title="Delete call"
-            >
-              &#x2715;
-            </button>
-          )}
+          <button
+            onClick={handleDeleteClick}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#4a6070',
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+              padding: '0 0.125rem',
+              lineHeight: 1,
+            }}
+            title="Delete call"
+          >
+            &#x2715;
+          </button>
         </div>
       </div>
     </div>
@@ -752,6 +704,7 @@ export default function AccountCalls({ accountId, onAttendeesSeeded }: AccountCa
       setCalls(rows);
     } catch (err) {
       console.error('Failed to load calls:', err);
+      showToast('error', 'Failed to load calls');
     }
   }, [accountId]);
 

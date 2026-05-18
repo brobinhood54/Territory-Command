@@ -3,7 +3,9 @@ import type { Account } from '@tc/shared';
 import Sidebar from './components/Sidebar';
 import AccountDetail from './components/AccountDetail';
 import Toast from './components/Toast';
-import { useToast } from './lib/toast';
+import { useToast, showToast } from './lib/toast';
+import ErrorBoundary from './components/ErrorBoundary';
+import { ConfirmModalRoot } from './components/ConfirmModal';
 
 export default function App() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -21,6 +23,7 @@ export default function App() {
       })
       .catch(err => {
         console.error('Failed to load accounts:', err);
+        showToast('error', 'Failed to load accounts. Try reloading the page.');
         setLoading(false);
       });
   }, []);
@@ -48,12 +51,15 @@ export default function App() {
         onToggleCollapse={() => setSidebarCollapsed(c => !c)}
       />
       <main style={{ flex: 1, overflow: 'auto', minWidth: 0 }}>
-        <AccountDetail
-          account={selectedAccount}
-          onUpdate={handleAccountUpdate}
-        />
+        <ErrorBoundary>
+          <AccountDetail
+            account={selectedAccount}
+            onUpdate={handleAccountUpdate}
+          />
+        </ErrorBoundary>
       </main>
       <Toast toasts={toast.toasts} onDismiss={toast.dismiss} />
+      <ConfirmModalRoot />
     </div>
   );
 }

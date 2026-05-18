@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import type { Account } from '@tc/shared';
 import { api } from '../lib/api';
 import type { AccountPatch } from '../lib/api';
+import { showToast } from '../lib/toast';
 
 const STATUS_OPTIONS = [
   'Prospect', 'Discovery', 'Champion Building', 'Evaluation',
@@ -160,8 +161,10 @@ export default function AccountOverview({ account, onUpdate }: AccountOverviewPr
       const updated = await api.accounts.update(account.id, patch);
       onUpdate(updated);
       flashSaved(field);
+      showToast('success', 'Saved', { quiet: true });
     } catch (err) {
       console.error('Failed to save:', err);
+      showToast('error', err instanceof Error ? err.message : 'Failed to save');
     }
   }
 
@@ -170,8 +173,10 @@ export default function AccountOverview({ account, onUpdate }: AccountOverviewPr
       const updated = await api.accounts.update(account.id, { status: value || null });
       onUpdate(updated);
       flashSaved('status');
+      showToast('success', 'Saved', { quiet: true });
     } catch (err) {
       console.error('Failed to save:', err);
+      showToast('error', err instanceof Error ? err.message : 'Failed to save');
     }
   }
 
@@ -181,8 +186,10 @@ export default function AccountOverview({ account, onUpdate }: AccountOverviewPr
       const updated = await api.accounts.update(account.id, { [field]: newVal });
       onUpdate(updated);
       flashSaved(field);
+      showToast('success', 'Saved', { quiet: true });
     } catch (err) {
       console.error('Failed to save:', err);
+      showToast('error', err instanceof Error ? err.message : 'Failed to save');
     }
   }
 

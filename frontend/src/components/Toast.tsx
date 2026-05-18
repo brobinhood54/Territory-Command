@@ -28,16 +28,17 @@ export default function Toast({ toasts = [], onDismiss }: ToastProps) {
         <div key={toast.id} style={{
           background: COLORS[toast.type] ?? COLORS.error,
           color: '#080e1a',
-          padding: '0.75rem 1rem',
+          padding: toast.quiet ? '0.5rem 0.875rem' : '0.75rem 1rem',
           borderRadius: '0.375rem',
           display: 'flex',
           alignItems: 'center',
           gap: '0.75rem',
           minWidth: '260px',
           maxWidth: '420px',
-          fontSize: '0.875rem',
+          fontSize: toast.quiet ? '0.8125rem' : '0.875rem',
           fontWeight: 500,
           boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          opacity: toast.quiet ? 0.7 : 1,
         }}>
           <span style={{ flex: 1 }}>{toast.message}</span>
           {onDismiss && (
