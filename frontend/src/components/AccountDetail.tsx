@@ -8,6 +8,7 @@ import AccountStakeholders from './AccountStakeholders';
 import AccountCalls from './AccountCalls';
 import AccountQuestions from './AccountQuestions';
 import AccountPainFit from './AccountPainFit';
+import AccountGameplan from './AccountGameplan';
 
 const TABS = [
   { key: 'overview', label: 'Overview' },
@@ -15,6 +16,7 @@ const TABS = [
   { key: 'calls', label: 'Calls' },
   { key: 'questions', label: 'Questions' },
   { key: 'painfit', label: 'Pain & Fit' },
+  { key: 'gameplan', label: 'Gameplan' },
 ];
 
 interface AccountDetailProps {
@@ -222,6 +224,14 @@ export default function AccountDetail({
               setHighlightCallId(callId);
             }}
             onSwitchToStakeholders={() => setActiveTab('stakeholders')}
+          />
+        )}
+        {activeTab === 'gameplan' && (
+          <AccountGameplan
+            accountId={account.id}
+            calls={calls}
+            questions={questions}
+            pains={pains}
           />
         )}
       </div>
