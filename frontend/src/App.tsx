@@ -35,7 +35,8 @@ export default function App() {
     <div style={{
       background: '#080e1a',
       color: '#dde6ee',
-      minHeight: '100vh',
+      height: '100vh',
+      overflow: 'hidden',
       display: 'flex',
     }}>
       <Sidebar
