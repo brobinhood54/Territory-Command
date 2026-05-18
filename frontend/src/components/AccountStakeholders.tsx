@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import type { Stakeholder } from '@tc/shared';
 import { api } from '../lib/api';
@@ -772,24 +772,23 @@ function StakeholderCard({
 interface AccountStakeholdersProps {
   accountId: string;
   accountName: string;
+  stakeholders: Stakeholder[];
+  loadingStakeholders: boolean;
+  onStakeholdersChange: (rows: Stakeholder[]) => void;
 }
 
-export default function AccountStakeholders({ accountId }: AccountStakeholdersProps) {
-  const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function AccountStakeholders({
+  accountId,
+  stakeholders,
+  loadingStakeholders,
+  onStakeholdersChange,
+}: AccountStakeholdersProps) {
   const [newId, setNewId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setLoading(true);
-    api.stakeholders.list(accountId)
-      .then(rows => { setStakeholders(rows); setLoading(false); })
-      .catch(err => { console.error('Failed to load stakeholders:', err); setLoading(false); showToast('error', 'Failed to load stakeholders'); });
-  }, [accountId]);
 
   async function handleAdd() {
     try {
       const created = await api.stakeholders.create(accountId, { name: '(new stakeholder)' });
-      setStakeholders(prev => [...prev, created]);
+      onStakeholdersChange([...stakeholders, created]);
       setNewId(created.id);
       showToast('success', 'Stakeholder added');
     } catch (err) {
@@ -799,14 +798,14 @@ export default function AccountStakeholders({ accountId }: AccountStakeholdersPr
   }
 
   function handleUpdate(updated: Stakeholder) {
-    setStakeholders(prev => prev.map(s => s.id === updated.id ? updated : s));
+    onStakeholdersChange(stakeholders.map(s => s.id === updated.id ? updated : s));
     setNewId(null);
   }
 
   async function handleDelete(id: string) {
     try {
       await api.stakeholders.delete(id);
-      setStakeholders(prev => prev.filter(s => s.id !== id));
+      onStakeholdersChange(stakeholders.filter(s => s.id !== id));
       showToast('success', 'Stakeholder deleted');
     } catch (err) {
       console.error('Failed to delete:', err);
@@ -817,8 +816,8 @@ export default function AccountStakeholders({ accountId }: AccountStakeholdersPr
   async function handleMerge(sourceId: string, targetId: string) {
     try {
       const updated = await api.stakeholders.merge(sourceId, targetId);
-      setStakeholders(prev =>
-        prev.filter(s => s.id !== sourceId).map(s => s.id === targetId ? updated : s)
+      onStakeholdersChange(
+        stakeholders.filter(s => s.id !== sourceId).map(s => s.id === targetId ? updated : s)
       );
       showToast('success', 'Stakeholders merged');
     } catch (err) {
@@ -848,7 +847,7 @@ export default function AccountStakeholders({ accountId }: AccountStakeholdersPr
     groups[t].push(s);
   }
 
-  if (loading) {
+  if (loadingStakeholders) {
     return (
       <div style={{ padding: '2rem', color: '#6b8599', fontSize: '0.875rem' }}>
         Loading stakeholders...
