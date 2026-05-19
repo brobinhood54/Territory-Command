@@ -1,4 +1,4 @@
-import type { Account, Stakeholder, Call, CallUploadResponse, CallReparseResponse, Question, QuestionWithContext, PainEnriched, PainWithSources, Pain, Gameplan, GameplanListEntry, PreCallPlan } from '@tc/shared';
+import type { Account, Stakeholder, Call, CallUploadResponse, CallReparseResponse, Question, QuestionWithContext, PainEnriched, PainWithSources, Pain, Gameplan, GameplanListEntry, PreCallPlan, CsvPreviewResponse, CsvCommitResponse } from '@tc/shared';
 
 const BASE = '/api';
 
@@ -241,4 +241,17 @@ export const api = {
       request<PreCallPlan>(`/pre-call-plans/${id}/unlink-call`, { method: 'POST' }),
   },
   data: { exportData, importData, backupNow },
+  csv: {
+    preview: (file: File): Promise<CsvPreviewResponse> => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return request<CsvPreviewResponse>('/csv-import/preview', { method: 'POST', body: formData });
+    },
+    commit: (file: File, mapping: Record<string, string | null>): Promise<CsvCommitResponse> => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('mapping', JSON.stringify(mapping));
+      return request<CsvCommitResponse>('/csv-import/commit', { method: 'POST', body: formData });
+    },
+  },
 };

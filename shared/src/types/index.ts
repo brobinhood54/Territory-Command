@@ -246,6 +246,25 @@ export interface PreCallPlanWithCall extends PreCallPlan {
   linked_call_date?: string | null;
 }
 
+export interface CsvColumnMappingResult {
+  mapping: { [tcField: string]: string | null };
+  ambiguous: { [tcField: string]: string[] };
+  unmapped: string[];
+}
+
+export interface CsvPreviewResponse {
+  headers: string[];
+  previewRows: string[][];
+  totalRows: number;
+  mapping: CsvColumnMappingResult;
+}
+
+export interface CsvCommitResponse {
+  ok: true;
+  accounts_inserted: number;
+  snapshot_path: string;
+}
+
 export interface CallAttendee {
   name: string;
   title: string;

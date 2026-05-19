@@ -14,6 +14,7 @@ import { painRoutes } from './routes/pains';
 import { backupRoutes } from './routes/backup';
 import { gameplanRoutes } from './routes/gameplans';
 import { preCallPlanRoutes } from './routes/preCallPlans';
+import { csvImportRoutes } from './routes/csvImport';
 
 async function main() {
   await runMigrations();
@@ -29,6 +30,7 @@ async function main() {
   app.route('/api', backupRoutes);
   app.route('/api', gameplanRoutes);
   app.route('/api', preCallPlanRoutes);
+  app.route('/api', csvImportRoutes);
 
   const port = 3001;
   serve({ fetch: app.fetch, port }, () => {

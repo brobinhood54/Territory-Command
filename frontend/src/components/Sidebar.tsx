@@ -3,6 +3,7 @@ import type { Account } from '@tc/shared';
 import { api } from '../lib/api';
 import { showToast } from '../lib/toast';
 import { showConfirm } from './ConfirmModal';
+import ImportCsvModal from './ImportCsvModal';
 
 interface SidebarProps {
   accounts: Account[];
@@ -61,6 +62,7 @@ export default function Sidebar({
   const [industryFilter, setIndustryFilter] = useState('All');
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [csvModalOpen, setCsvModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleExport() {
@@ -450,7 +452,27 @@ export default function Sidebar({
             >
               Backup
             </button>
+            <button
+              onClick={() => setCsvModalOpen(true)}
+              title="Import accounts from a CSV file"
+              style={{
+                flex: 1,
+                background: '#162032',
+                border: '1px solid #1e3048',
+                borderRadius: '0.25rem',
+                color: '#6b8599',
+                fontSize: '0.675rem',
+                fontWeight: 500,
+                padding: '0.3rem 0.25rem',
+                cursor: 'pointer',
+                letterSpacing: '0.04em',
+                fontFamily: 'inherit',
+              }}
+            >
+              CSV
+            </button>
           </div>
+          {csvModalOpen && <ImportCsvModal onClose={() => setCsvModalOpen(false)} accountCount={accounts.length} />}
         </>
       )}
     </aside>
